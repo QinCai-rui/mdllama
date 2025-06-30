@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Ollama & Groq CLI - A command-line interface for both Ollama and Groq APIs
+Ollama CLI - A command-line interface for Ollama API
 Features:
-- Support for both Ollama (local) and Groq (cloud) APIs
+- Support for Ollama (local) API
 - Interactive chat mode with multiline support
 - Terminal formatting and colors
 - Context management for conversations
@@ -31,12 +31,6 @@ try:
     OLLAMA_AVAILABLE = True
 except ImportError:
     OLLAMA_AVAILABLE = False
-
-try:
-    from groq import Groq
-    GROQ_AVAILABLE = True
-except ImportError:
-    GROQ_AVAILABLE = False
 
 try:
     from rich.console import Console
@@ -96,18 +90,13 @@ class Colors:
 class LLM_CLI:
     def __init__(self, 
                  use_colors=True, 
-                 render_markdown=True, 
-                 provider: Literal["groq", "ollama", "auto"] = "auto"):
-        self.groq_client = None
+                 render_markdown=True):
         self.ollama_client = None
-        self.api_key = None
         self.config = self._load_config()
         self.use_colors = use_colors
         self.render_markdown = render_markdown
         self.current_context: List[Dict[str, Any]] = []
         self.current_session_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.provider = provider
-        self.current_provider = None  # Will be set during client setup
         
         # Initialize rich console if available
         self.console = Console() if RICH_AVAILABLE else None
@@ -117,24 +106,6 @@ class LLM_CLI:
             r'https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+(?:/[-\w%!$&\'()*+,;=:@/~]+)*(?:\?[-\w%!$&\'()*+,;=:@/~]*)?(?:#[-\w%!$&\'()*+,;=:@/~]*)?'
         )
 
-    def _setup_groq_client(self):
-        """Initialize the Groq client with API key from config or environment."""
-        if not GROQ_AVAILABLE:
-            self._print_error("Groq Python package not installed. Install with: pip install groq")
-            return False
-            
-        self.api_key = self.config.get('groq_api_key') or os.environ.get("GROQ_API_KEY")
-        
-        if not self.api_key:
-            return False
-        
-        try:
-            self.groq_client = Groq(api_key=self.api_key)
-            return True
-        except Exception as e:
-            self._print_error(f"Error initializing Groq client: {e}")
-            return False
-            
     def _setup_ollama_client(self):
         """Initialize the Ollama client."""
         if not OLLAMA_AVAILABLE:
@@ -257,18 +228,10 @@ class LLM_CLI:
             else:
                 print(formatted_text)
 
-    def setup(self, groq_api_key: Optional[str] = None, ollama_host: Optional[str] = None):
-        """Set up the CLI with API keys and other configurations."""
-        self._print_info("Setting up LLM CLI...")
+    def setup(self, ollama_host: Optional[str] = None):
+        """Set up the CLI with Ollama configuration."""
+        self._print_info("Setting up Ollama CLI...")
         
-        # Groq setup
-        if groq_api_key:
-            self.config['groq_api_key'] = groq_api_key
-        else:
-            groq_api_key = input("Enter your Groq API key (leave empty to use environment variable or skip): ").strip()
-            if groq_api_key:
-                self.config['groq_api_key'] = groq_api_key
-                
         # Ollama setup
         if ollama_host:
             self.config['ollama_host'] = ollama_host
@@ -279,64 +242,17 @@ class LLM_CLI:
                 
         self._save_config()
         
-        # Test connections
-        groq_success = self._setup_groq_client()
+        # Test connection
         ollama_success = self._setup_ollama_client()
         
-        if groq_success:
-            self._print_success("Groq API connected successfully!")
-        else:
-            self._print_info("Groq API not configured or connection failed.")
-            
         if ollama_success:
             self._print_success("Ollama connected successfully!")
-        else:
-            self._print_info("Ollama not configured or connection failed.")
-            
-        if not groq_success and not ollama_success:
-            self._print_error("No LLM providers configured successfully. Please check your settings.")
-        else:
             self._print_success("Setup complete!")
-
-    def _determine_provider(self, model_name: str):
-        """Determine which provider to use based on model name and availability."""
-        if self.provider != "auto":
-            return self.provider
-            
-        # Common Groq model prefixes
-        groq_prefixes = ["meta-llama", "llama-", "gemma-", "mixtral-"]
-        
-        # Check if model name matches Groq model patterns
-        is_likely_groq = any(model_name.startswith(prefix) for prefix in groq_prefixes) or "-" in model_name
-        
-        # If model looks like a Groq model and Groq is available, use Groq
-        if is_likely_groq and self.groq_client is not None:
-            return "groq"
-        # Otherwise if Ollama is available, use Ollama
-        elif self.ollama_client is not None:
-            return "ollama"
-        # Fall back to Groq if it's available
-        elif self.groq_client is not None:
-            return "groq"
-        # No providers available
         else:
-            return None
+            self._print_error("Ollama not configured or connection failed. Please check your settings.")
 
     def list_models(self):
-        """List available models from both Groq and Ollama."""
-        # List Groq models if available
-        if self.groq_client or self._setup_groq_client():
-            try:
-                models = self.groq_client.models.list()
-                self._print_info("Available Groq models:")
-                for model in models.data:
-                    if self.use_colors:
-                        print(f"- {Colors.BRIGHT_GREEN}{model.id}{Colors.RESET}")
-                    else:
-                        print(f"- {model.id}")
-            except Exception as e:
-                self._print_error(f"Error listing Groq models: {e}")
-                
+        """List available models from Ollama."""
         # List Ollama models if available
         if self.ollama_client or self._setup_ollama_client():
             try:
@@ -355,79 +271,31 @@ class LLM_CLI:
                     self._print_error(f"Error listing Ollama models: HTTP {response.status_code}")
             except Exception as e:
                 self._print_error(f"Error listing Ollama models: {e}")
+        else:
+            self._print_error("Ollama not configured or not running. Please check Ollama installation.")
 
-    def _ensure_client(self, provider=None):
-        """Ensure the appropriate client is initialized before making API calls."""
-        if provider == "groq" or (provider is None and self.provider == "groq"):
-            if self.groq_client is None:
-                if not self._setup_groq_client():
-                    self._print_error("No Groq API key configured. Please run 'setup' command first.")
-                    return False
-            return True
-            
-        if provider == "ollama" or (provider is None and self.provider == "ollama"):
-            if self.ollama_client is None:
-                if not self._setup_ollama_client():
-                    self._print_error("Ollama not configured or not running. Please check Ollama installation.")
-                    return False
-            return True
-            
-        # If auto or not specified, try to ensure at least one client is available
-        if self.groq_client is None and self.ollama_client is None:
-            groq_ok = self._setup_groq_client()
-            ollama_ok = self._setup_ollama_client()
-            if not groq_ok and not ollama_ok:
-                self._print_error("No LLM providers configured. Please run 'setup' command first.")
+    def _ensure_client(self):
+        """Ensure the Ollama client is initialized before making API calls."""
+        if self.ollama_client is None:
+            if not self._setup_ollama_client():
+                self._print_error("Ollama not configured or not running. Please run 'setup' command first.")
                 return False
         return True
 
     def _prepare_messages(
         self, 
         prompt: str, 
-        system_prompt: Optional[str] = None,
-        image_paths: Optional[List[str]] = None
+        system_prompt: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """Prepare messages for completion, including context and images."""
+        """Prepare messages for completion, including context."""
         messages = self.current_context.copy()
 
         # Add system prompt if provided and not already present
         if system_prompt and not any(m.get("role") == "system" for m in messages):
             messages.append({"role": "system", "content": system_prompt})
             
-        # Handle image uploads if provided
-        if image_paths:
-            # Only Groq supports images currently
-            if self.current_provider == "groq":
-                content_parts = []
-                
-                # Add each image as a content part
-                for img_path in image_paths:
-                    try:
-                        with open(img_path, "rb") as img_file:
-                            # For simplicity, we'll use base64 encoding
-                            import base64
-                            image_data = base64.b64encode(img_file.read()).decode("utf-8")
-                            content_parts.append({
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{image_data}"
-                                }
-                            })
-                    except Exception as e:
-                        self._print_error(f"Error processing image {img_path}: {e}")
-                
-                # Add the text prompt
-                content_parts.append({"type": "text", "text": prompt})
-                
-                # Add the multimodal message
-                messages.append({"role": "user", "content": content_parts})
-            else:
-                self._print_error("Image support is only available with Groq API.")
-                # Add text-only message
-                messages.append({"role": "user", "content": prompt})
-        else:
-            # Simple text-only message
-            messages.append({"role": "user", "content": prompt})
+        # Add the text prompt
+        messages.append({"role": "user", "content": prompt})
             
         return messages
 
@@ -575,25 +443,18 @@ class LLM_CLI:
     def complete(
         self,
         prompt: str,
-        model: str = "meta-llama/llama-4-scout-17b-16e-instruct",
+        model: str = "llama3.2",
         stream: bool = False,
         system_prompt: Optional[str] = None,
-        image_paths: Optional[List[str]] = None,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
         file_paths: Optional[List[str]] = None,
         keep_context: bool = True,
         save_history: bool = False
     ) -> Optional[str]:
-        """Generate a completion from Groq or Ollama API."""
-        # Determine which provider to use for this model
-        self.current_provider = self._determine_provider(model)
+        """Generate a completion from Ollama API."""
         
-        if not self.current_provider:
-            self._print_error("No available provider for this model.")
-            return None
-            
-        if not self._ensure_client(self.current_provider):
+        if not self._ensure_client():
             return None
 
         # Prepare any file attachments
@@ -608,126 +469,17 @@ class LLM_CLI:
                     self._print_error(f"Error reading file {file_path}: {e}")
 
         # Prepare messages including context
-        messages = self._prepare_messages(prompt, system_prompt, image_paths)
+        messages = self._prepare_messages(prompt, system_prompt)
 
         try:
-            if self.current_provider == "groq":
-                return self._complete_with_groq(
-                    messages, model, stream, temperature, max_tokens, keep_context, save_history
-                )
-            else:  # ollama
-                return self._complete_with_ollama(
-                    messages, model, stream, temperature, max_tokens, keep_context, save_history
-                )
+            return self._complete_with_ollama(
+                messages, model, stream, temperature, max_tokens, keep_context, save_history
+            )
                 
         except Exception as e:
             self._print_error(f"Error during completion: {e}")
             return None
 
-    def _complete_with_groq(
-        self,
-        messages: List[Dict[str, Any]],
-        model: str,
-        stream: bool,
-        temperature: float,
-        max_tokens: Optional[int],
-        keep_context: bool,
-        save_history: bool
-    ) -> Optional[str]:
-        """Complete using Groq API."""
-        # Set up completion parameters
-        completion_params = {
-            "model": model,
-            "messages": messages,
-            "temperature": temperature,
-            "stream": stream,
-        }
-        
-        if max_tokens:
-            completion_params["max_tokens"] = max_tokens
-            
-        if stream:
-            # Check if we should use live markdown rendering
-            if self.render_markdown and RICH_AVAILABLE and self.console:
-                # Use live display for streaming markdown
-                full_response = self._stream_with_live_markdown(
-                    self.groq_client.chat.completions.create(**completion_params)
-                )
-            else:
-                # Standard streaming without markdown rendering
-                full_response = ""
-                buffer = ""  # Buffer to accumulate text for link processing
-                
-                for chunk in self.groq_client.chat.completions.create(**completion_params):
-                    if chunk.choices:
-                        content = chunk.choices[0].delta.content
-                        if content:
-                            buffer += content
-                            full_response += content
-                            
-                            # Process buffer when we have enough context to identify links
-                            if len(buffer) > 100 or any(c in buffer for c in [' ', '\n', '.', ',', ')']):
-                                if self.use_colors:
-                                    processed_buffer = self._process_links_in_markdown(buffer)
-                                    print(f"{Colors.GREEN}{processed_buffer}{Colors.RESET}", end="", flush=True)
-                                else:
-                                    print(buffer, end="", flush=True)
-                                buffer = ""  # Clear the buffer after processing
-                
-                # Process any remaining text in the buffer
-                if buffer:
-                    if self.use_colors:
-                        processed_buffer = self._process_links_in_markdown(buffer)
-                        print(f"{Colors.GREEN}{processed_buffer}{Colors.RESET}", end="", flush=True)
-                    else:
-                        print(buffer, end="", flush=True)
-                        
-                print()  # Add final newline
-                
-                # Render markdown after streaming if enabled but not streamed
-                if self.render_markdown and not (RICH_AVAILABLE and self.console):
-                    self._render_markdown(full_response)
-            
-            # Add the assistant's response to the context if keeping context
-            if keep_context:
-                user_message = messages[-1]  # Get the last user message
-                self.current_context.append(user_message)
-                self.current_context.append({"role": "assistant", "content": full_response})
-            
-            return full_response
-        else:
-            # Get the full response at once
-            response = self.groq_client.chat.completions.create(**completion_params)
-            if response.choices:
-                full_response = response.choices[0].message.content
-                
-                # For non-streaming responses with markdown
-                if self.render_markdown and RICH_AVAILABLE and self.console:
-                    self.console.print(Markdown(full_response))
-                else:
-                    # Process links in the full response
-                    processed_response = self._process_links_in_markdown(full_response)
-                    if self.use_colors:
-                        print(f"{Colors.GREEN}{processed_response}{Colors.RESET}")
-                    else:
-                        print(full_response)
-                    
-                    # Render markdown after response if enabled but not rendered
-                    if self.render_markdown and not (RICH_AVAILABLE and self.console):
-                        self._render_markdown(full_response)
-                
-                # Add to context if keeping context
-                if keep_context:
-                    user_message = messages[-1]  # Get the last user message
-                    self.current_context.append(user_message)
-                    self.current_context.append({"role": "assistant", "content": full_response})
-                
-                return full_response
-        
-        # Save history if requested
-        if save_history:
-            self._save_history(self.current_context)
-    
     def _complete_with_ollama(
         self,
         messages: List[Dict[str, Any]],
