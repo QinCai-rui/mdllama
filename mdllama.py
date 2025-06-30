@@ -827,7 +827,7 @@ class LLM_CLI:
         
     def interactive_chat(
         self,
-        model: str = "llama3.2",
+        model: str = "gemma3:1b",
         system_prompt: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
@@ -996,7 +996,7 @@ def main():
     # Chat completion command
     chat_parser = subparsers.add_parser("chat", help="Generate a chat completion")
     chat_parser.add_argument("prompt", help="The prompt to send to the API", nargs="?")
-    chat_parser.add_argument("--model", "-m", default="llama3.2", 
+    chat_parser.add_argument("--model", "-m", default="gemma3:1b", 
                             help="Model to use for completion")
     chat_parser.add_argument("--stream", "-s", action="store_true", help="Stream the response")
     chat_parser.add_argument("--system", help="System prompt to use")
@@ -1013,7 +1013,7 @@ def main():
     
     # Interactive chat command
     interactive_parser = subparsers.add_parser("run", help="Start an interactive chat session")
-    interactive_parser.add_argument("--model", "-m", default="llama3.2", 
+    interactive_parser.add_argument("--model", "-m", default="gemma3:1b", 
                                   help="Model to use for completion")
     interactive_parser.add_argument("--system", "-s", help="System prompt to use")
     interactive_parser.add_argument("--temperature", "-t", type=float, default=0.7, help="Temperature for sampling")
