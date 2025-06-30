@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Ollama CLI - A command-line interface for Ollama API
+mdllama - A command-line interface for Ollama API
 Features:
 - Support for Ollama (local) API
 - Interactive chat mode with multiline support
@@ -41,7 +41,7 @@ try:
 except ImportError:
     RICH_AVAILABLE = False
 
-CONFIG_DIR = Path.home() / ".llm-cli"
+CONFIG_DIR = Path.home() / ".mdllama"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 HISTORY_DIR = CONFIG_DIR / "history"
 OLLAMA_DEFAULT_HOST = "http://localhost:11434"
@@ -443,7 +443,7 @@ class LLM_CLI:
     def complete(
         self,
         prompt: str,
-        model: str = "llama3.2",
+        model: str = "gemma3:1b",
         stream: bool = False,
         system_prompt: Optional[str] = None,
         temperature: float = 0.7,
