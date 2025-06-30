@@ -491,8 +491,7 @@ class LLM_CLI:
         save_history: bool
     ) -> Optional[str]:
         """Complete using Ollama API."""
-        # Set up completion parameters
-        # Note: The Ollama API might have different parameter names compared to the OpenAI/Groq API
+        # Set up completion parameters for Ollama API
         completion_params = {
             "model": model,
             "messages": messages,
@@ -828,36 +827,28 @@ class LLM_CLI:
         
     def interactive_chat(
         self,
-        model: str = "meta-llama/llama-4-scout-17b-16e-instruct",
+        model: str = "llama3.2",
         system_prompt: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
         save_history: bool = False
     ):
         """Start an interactive chat session."""
-        # Determine which provider to use for this model
-        self.current_provider = self._determine_provider(model)
         
-        if not self.current_provider:
-            self._print_error("No available provider for this model.")
-            return
-            
-        if not self._ensure_client(self.current_provider):
+        if not self._ensure_client():
             return
             
         # Print header with model info and date/time
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        provider_display = self.current_provider.upper()
         
         if self.use_colors:
-            provider_color = Colors.BRIGHT_CYAN if self.current_provider == "groq" else Colors.BRIGHT_YELLOW
-            print(f"{Colors.BG_BLUE}{Colors.WHITE} {provider_display} CLI {Colors.RESET}")
-            print(f"{Colors.BRIGHT_CYAN}Model:{Colors.RESET} {provider_color}{model}{Colors.RESET}")
+            print(f"{Colors.BG_BLUE}{Colors.WHITE} OLLAMA CLI {Colors.RESET}")
+            print(f"{Colors.BRIGHT_CYAN}Model:{Colors.RESET} {Colors.BRIGHT_YELLOW}{model}{Colors.RESET}")
             print(f"{Colors.BRIGHT_CYAN}Time: {Colors.RESET}{Colors.WHITE}{current_time}{Colors.RESET}")
             print(f"{Colors.BRIGHT_CYAN}User: {Colors.RESET}{Colors.WHITE}{os.environ.get('USER', 'unknown')}{Colors.RESET}")
             print()
         else:
-            print(f"{provider_display} CLI")
+            print("OLLAMA CLI")
             print(f"Model: {model}")
             print(f"Time: {current_time}")
             print(f"User: {os.environ.get('USER', 'unknown')}")
@@ -948,14 +939,8 @@ class LLM_CLI:
                 elif user_input.startswith('model:'):
                     new_model = user_input[6:].strip()
                     if new_model:
-                        # Check if we need to switch providers
-                        new_provider = self._determine_provider(new_model)
-                        if new_provider and self._ensure_client(new_provider):
-                            model = new_model
-                            self.current_provider = new_provider
-                            self._print_success(f"Switched to model: {model} (Provider: {self.current_provider})")
-                        else:
-                            self._print_error(f"Could not switch to model: {new_model}")
+                        model = new_model
+                        self._print_success(f"Switched to model: {model}")
                     else:
                         self._print_error("Please specify a model name.")
                     continue
@@ -996,14 +981,13 @@ class LLM_CLI:
 
 def main():
     """Main CLI entrypoint."""
-    parser = argparse.ArgumentParser(description="LLM CLI - A command-line interface for Groq and Ollama APIs")
+    parser = argparse.ArgumentParser(description="Ollama CLI - A command-line interface for Ollama API")
     
     # Create subparsers for different commands
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
     
     # Setup command
-    setup_parser = subparsers.add_parser("setup", help="Set up the CLI with API keys")
-    setup_parser.add_argument("--groq-api-key", help="Groq API key")
+    setup_parser = subparsers.add_parser("setup", help="Set up the CLI with Ollama configuration")
     setup_parser.add_argument("--ollama-host", help="Ollama host URL")
     
     # List models command
@@ -1012,13 +996,10 @@ def main():
     # Chat completion command
     chat_parser = subparsers.add_parser("chat", help="Generate a chat completion")
     chat_parser.add_argument("prompt", help="The prompt to send to the API", nargs="?")
-    chat_parser.add_argument("--model", "-m", default="meta-llama/llama-4-scout-17b-16e-instruct", 
+    chat_parser.add_argument("--model", "-m", default="llama3.2", 
                             help="Model to use for completion")
-    chat_parser.add_argument("--provider", "-p", choices=["groq", "ollama", "auto"], default="auto",
-                            help="Provider to use (groq, ollama, or auto-detect)")
     chat_parser.add_argument("--stream", "-s", action="store_true", help="Stream the response")
     chat_parser.add_argument("--system", help="System prompt to use")
-    chat_parser.add_argument("--image", "-i", action="append", help="Path to image file(s) to include (Groq only)")
     chat_parser.add_argument("--temperature", "-t", type=float, default=0.7, help="Temperature for sampling")
     chat_parser.add_argument("--max-tokens", type=int, help="Maximum number of tokens to generate")
     chat_parser.add_argument("--file", "-f", action="append", help="Path to file(s) to include as context")
@@ -1032,10 +1013,8 @@ def main():
     
     # Interactive chat command
     interactive_parser = subparsers.add_parser("run", help="Start an interactive chat session")
-    interactive_parser.add_argument("--model", "-m", default="meta-llama/llama-4-scout-17b-16e-instruct", 
+    interactive_parser.add_argument("--model", "-m", default="llama3.2", 
                                   help="Model to use for completion")
-    interactive_parser.add_argument("--provider", "-p", choices=["groq", "ollama", "auto"], default="auto",
-                                  help="Provider to use (groq, ollama, or auto-detect)")
     interactive_parser.add_argument("--system", "-s", help="System prompt to use")
     interactive_parser.add_argument("--temperature", "-t", type=float, default=0.7, help="Temperature for sampling")
     interactive_parser.add_argument("--max-tokens", type=int, help="Maximum number of tokens to generate")
@@ -1073,16 +1052,11 @@ def main():
         print("Markdown rendering will be disabled.")
         render_markdown = False
     
-    # Set provider preference if specified
-    provider = "auto"
-    if hasattr(args, 'provider'):
-        provider = args.provider
-    
-    cli = LLM_CLI(use_colors=use_colors, render_markdown=render_markdown, provider=provider)
+    cli = LLM_CLI(use_colors=use_colors, render_markdown=render_markdown)
     
     # Handle commands
     if args.command == "setup":
-        cli.setup(args.groq_api_key, args.ollama_host)
+        cli.setup(args.ollama_host)
     elif args.command == "models":
         cli.list_models()
     elif args.command == "chat":
@@ -1109,7 +1083,6 @@ def main():
             model=args.model,
             stream=args.stream,
             system_prompt=args.system,
-            image_paths=args.image,
             temperature=args.temperature,
             max_tokens=args.max_tokens,
             file_paths=args.file,
