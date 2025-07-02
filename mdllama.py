@@ -18,7 +18,7 @@ import argparse
 import json
 import os
 import sys
-import readline  # For better input handling (command history)
+#import readline  # For better input handling (command history)
 from typing import List, Dict, Optional, Union, Any, Literal
 from pathlib import Path
 import datetime
