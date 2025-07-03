@@ -12,6 +12,19 @@ mdllama makes it easy to interact with Ollama's AI models directly from your com
 
 ## Screenshots
 
+### Chat Interface
+![Chat](assets/chat.png)
+
+### Help
+![Help](assets/help.png)
+
+### Install and Uninstall
+![Installer](assets/installation.png)
+![Installer](assets/installation2.png)
+
+![Uninstaller](assets/uninstallation.png)
+
+
 ## Installation
 
 To install **mdllama**, run:
