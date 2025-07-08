@@ -18,12 +18,6 @@ mdllama makes it easy to interact with Ollama's AI models directly from your com
 ### Help
 ![Help](assets/help.png)
 
-### Install and Uninstall
-![Installer](assets/installation.png)
-![Installer](assets/installation2.png)
-
-![Uninstaller](assets/uninstallation.png)
-
 ## Demo
 
 <video controls src="assets/demo.webm" title="Demo"></video>
