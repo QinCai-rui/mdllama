@@ -1,12 +1,10 @@
 name: Publish to PyPI on mdllama.py Update
 
 on:
-  push:
-    paths:
-      - 'src/mdllama.py'
-    branches:
-      - main
-  workflow_dispatch:
+  workflow_run:
+    workflows: ["Update RELEASE on GitHub Release"]
+    types:
+      - completed
 
 jobs:
   build-and-publish:
