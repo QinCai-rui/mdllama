@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mdllama"
+version = "1.0.0"
+description = "A command-line interface for Ollama API"
+authors = [{ name = "QinCai-rui" }]
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.7"
+dependencies = [
+  "requests",
+  "ollama",
+  "rich"
+]
+
+[project.scripts]
+mdllama = "mdllama:main"
