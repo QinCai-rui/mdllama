@@ -15,12 +15,17 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.x'
 
       - name: Install stdeb and build tools
         run: |
           python -m pip install --upgrade pip
           pip install stdeb setuptools
+
+      - name: Install Debian build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3-all debhelper
 
       - name: Build Debian package
         run: |
