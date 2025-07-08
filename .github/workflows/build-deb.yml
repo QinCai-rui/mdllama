@@ -20,7 +20,7 @@ jobs:
       - name: Install stdeb and build tools
         run: |
           python -m pip install --upgrade pip
-          pip install stdeb
+          pip install stdeb setuptools
 
       - name: Build Debian package
         run: |
