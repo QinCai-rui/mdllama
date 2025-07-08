@@ -1,9 +1,14 @@
 name: Update RELEASE on GitHub Release
 
+
 on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag name (for manual run)'
+        required: false
 
 permissions:
   contents: write
@@ -22,14 +27,25 @@ jobs:
           echo "Checking out branch: $branch"
           git checkout "$(echo "$branch" | xargs)"
 
+      - name: Set tag name variable
+        id: set_tag
+        run: |
+          if [ -n "${{ github.event.release.tag_name }}" ]; then
+            echo "TAG_NAME=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
+          elif [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            echo "TAG_NAME=${{ github.event.inputs.tag_name }}" >> $GITHUB_ENV
+          else
+            echo "TAG_NAME=unknown" >> $GITHUB_ENV
+          fi
+
       - name: Update RELEASE file with tag name
         run: |
-          echo "${{ github.event.release.tag_name }}" > RELEASE
+          echo "$TAG_NAME" > RELEASE
 
       - name: Update version in pyproject.toml and setup.py [Action]
         run: |
-          sed -i "s/version = \".*\"/version = \"${{ github.event.release.tag_name }}\"/" src/pyproject.toml
-          sed -i "s/version=\".*\"/version=\"${{ github.event.release.tag_name }}\"/" src/setup.py
+          sed -i "s/version = \".*\"/version = \"$TAG_NAME\"/" src/pyproject.toml
+          sed -i "s/version=\".*\"/version=\"$TAG_NAME\"/" src/setup.py
 
       - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v5
