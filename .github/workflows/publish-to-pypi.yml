@@ -6,31 +6,29 @@ on:
       - 'mdllama.py'
     branches:
       - main
-  workflow_dispatch:  # This enables manual runs from the Actions tab
+  workflow_dispatch:
 
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.x'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
-    - name: Install build tools
-      run: |
-        python -m pip install --upgrade pip
-        pip install build twine
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
 
-    - name: Build package
-      run: python -m build
+      - name: Build package
+        run: python -m build
 
-    - name: Publish to PyPI
-      env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      run: |
-        twine upload dist/*
+      - name: Publish to PyPI with Trusted Publisher
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
