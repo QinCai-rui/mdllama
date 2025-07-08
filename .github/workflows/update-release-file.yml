@@ -1,0 +1,22 @@
+name: Update RELEASE on GitHub Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-release-file:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update RELEASE file with tag name
+        run: |
+          echo "${{ github.event.release.tag_name }}" > RELEASE
+
+      - name: Commit and push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Update RELEASE file on new GitHub release
+          file_pattern: RELEASE
