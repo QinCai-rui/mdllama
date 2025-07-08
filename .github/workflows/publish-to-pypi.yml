@@ -29,9 +29,11 @@ jobs:
           pip install build
 
       - name: Build package
-        run: python -m build src/
+        working-directory: src
+        run: python -m build
 
       - name: Publish to PyPI with Trusted Publisher
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           skip-existing: true
+          packages-dir: src/dist
