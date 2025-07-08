@@ -6,6 +6,7 @@ on:
       - 'mdllama.py'
     branches:
       - main
+  workflow_dispatch:  # This enables manual runs from the Actions tab
 
 jobs:
   build-and-publish:
