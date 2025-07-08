@@ -42,7 +42,7 @@ jobs:
         run: |
           echo "$TAG_NAME" > RELEASE
 
-      - name: Update version in pyproject.toml and setup.py [Action]
+      - name: Update version in pyproject.toml and setup.py [Actions]
         run: |
           sed -i "s/version = \".*\"/version = \"$TAG_NAME\"/" src/pyproject.toml
           sed -i "s/version=\".*\"/version=\"$TAG_NAME\"/" src/setup.py
@@ -50,5 +50,5 @@ jobs:
       - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: Update RELEASE and version for new GitHub release [Action]
+          commit_message: Update RELEASE and version for new GitHub release [Actions]
           file_pattern: RELEASE src/pyproject.toml src/setup.py
