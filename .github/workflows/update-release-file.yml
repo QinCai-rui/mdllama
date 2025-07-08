@@ -14,9 +14,13 @@ jobs:
       - name: Update RELEASE file with tag name
         run: |
           echo "${{ github.event.release.tag_name }}" > RELEASE
+      - name: Update version in pyproject.toml and setup.py [Action]
+        run: |
+          sed -i "s/version = \".*\"/version = \"${{ github.event.release.tag_name }}\"/" src/pyproject.toml
+          sed -i "s/version=\".*\"/version=\"${{ github.event.release.tag_name }}\"/" src/setup.py
 
       - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: Update RELEASE file on new GitHub release
-          file_pattern: RELEASE
+          commit_message: Update RELEASE and version for new GitHub release [Action]
+          file_pattern: RELEASE src/pyproject.toml src/setup.py
