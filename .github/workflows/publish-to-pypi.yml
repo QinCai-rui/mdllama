@@ -3,7 +3,7 @@ name: Publish to PyPI on mdllama.py Update
 on:
   push:
     paths:
-      - 'mdllama.py'
+      - 'src/mdllama.py'
     branches:
       - main
   workflow_dispatch:
@@ -30,7 +30,7 @@ jobs:
           pip install build
 
       - name: Build package
-        run: python -m build
+        run: python -m build src/
 
       - name: Publish to PyPI with Trusted Publisher
         uses: pypa/gh-action-pypi-publish@release/v1
