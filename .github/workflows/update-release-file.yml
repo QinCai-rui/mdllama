@@ -11,9 +11,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Check out the branch for this release tag
+        run: |
+          git fetch --all
+          branch=$(git branch -r --contains "${GITHUB_SHA}" | grep -v HEAD | head -n 1 | sed 's/origin\///')
+          echo "Checking out branch: $branch"
+          git checkout "$branch"
+
       - name: Update RELEASE file with tag name
         run: |
           echo "${{ github.event.release.tag_name }}" > RELEASE
+
       - name: Update version in pyproject.toml and setup.py [Action]
         run: |
           sed -i "s/version = \".*\"/version = \"${{ github.event.release.tag_name }}\"/" src/pyproject.toml
