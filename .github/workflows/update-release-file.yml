@@ -3,6 +3,7 @@ name: Update RELEASE on GitHub Release
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 jobs:
   update-release-file:
