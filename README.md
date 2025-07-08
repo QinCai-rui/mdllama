@@ -13,15 +13,15 @@ mdllama makes it easy to interact with Ollama's AI models directly from your com
 ## Screenshots
 
 ### Chat Interface
-![Chat](assets/chat.png)
+![Chat](https://raw.githubusercontent.com/QinCai-rui/mdllama/refs/heads/main/assets/chat.png)
 
 ### Help
-![Help](assets/help.png)
+![Help](https://raw.githubusercontent.com/QinCai-rui/mdllama/refs/heads/main/assets/help.png)
 
 ## Demo
 
-<video controls src="assets/demo.webm" title="Demo"></video>
-Note: If the video does not play, you can download it [here](assets/demo.webm).
+<video controls src="https://raw.githubusercontent.com/QinCai-rui/mdllama/refs/heads/main/assets/demo.webm" title="Demo"></video>
+Note: If the video does not play, you can download it [here](https://raw.githubusercontent.com/QinCai-rui/mdllama/refs/heads/main/assets/demo.webm).
 
 ## Installation
 
