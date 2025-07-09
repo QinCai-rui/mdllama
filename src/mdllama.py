@@ -25,6 +25,9 @@ from pathlib import Path
 import datetime
 import re  # For URL detection
 import requests  # For direct API calls to Ollama if needed
+from colorama import init as colorama_init, Fore, Back, Style
+
+colorama_init(autoreset=True)
 
 try:
     # Try to import the Ollama Python client
@@ -49,39 +52,39 @@ OLLAMA_DEFAULT_HOST = "http://localhost:11434"
 
 # ANSI color codes for terminal formatting
 class Colors:
-    RESET = "\033[0m"
-    BOLD = "\033[1m"
-    UNDERLINE = "\033[4m"
+    RESET = Style.RESET_ALL
+    BOLD = Style.BRIGHT
+    UNDERLINE = '\033[4m'  # Use ANSI escape code for underline
     
     # Foreground colors
-    BLACK = "\033[30m"
-    RED = "\033[31m"
-    GREEN = "\033[32m"
-    YELLOW = "\033[33m"
-    BLUE = "\033[34m"
-    MAGENTA = "\033[35m"
-    CYAN = "\033[36m"
-    WHITE = "\033[37m"
+    BLACK = Fore.BLACK
+    RED = Fore.RED
+    GREEN = Fore.GREEN
+    YELLOW = Fore.YELLOW
+    BLUE = Fore.BLUE
+    MAGENTA = Fore.MAGENTA
+    CYAN = Fore.CYAN
+    WHITE = Fore.WHITE
     
     # Background colors
-    BG_BLACK = "\033[40m"
-    BG_RED = "\033[41m"
-    BG_GREEN = "\033[42m"
-    BG_YELLOW = "\033[43m"
-    BG_BLUE = "\033[44m"
-    BG_MAGENTA = "\033[45m"
-    BG_CYAN = "\033[46m"
-    BG_WHITE = "\033[47m"
+    BG_BLACK = Back.BLACK
+    BG_RED = Back.RED
+    BG_GREEN = Back.GREEN
+    BG_YELLOW = Back.YELLOW
+    BG_BLUE = Back.BLUE
+    BG_MAGENTA = Back.MAGENTA
+    BG_CYAN = Back.CYAN
+    BG_WHITE = Back.WHITE
     
     # Bright foreground colors
-    BRIGHT_BLACK = "\033[90m"
-    BRIGHT_RED = "\033[91m"
-    BRIGHT_GREEN = "\033[92m"
-    BRIGHT_YELLOW = "\033[93m"
-    BRIGHT_BLUE = "\033[94m"
-    BRIGHT_MAGENTA = "\033[95m"
-    BRIGHT_CYAN = "\033[96m"
-    BRIGHT_WHITE = "\033[97m"
+    BRIGHT_BLACK = Fore.LIGHTBLACK_EX
+    BRIGHT_RED = Fore.LIGHTRED_EX
+    BRIGHT_GREEN = Fore.LIGHTGREEN_EX
+    BRIGHT_YELLOW = Fore.LIGHTYELLOW_EX
+    BRIGHT_BLUE = Fore.LIGHTBLUE_EX
+    BRIGHT_MAGENTA = Fore.LIGHTMAGENTA_EX
+    BRIGHT_CYAN = Fore.LIGHTCYAN_EX
+    BRIGHT_WHITE = Fore.LIGHTWHITE_EX
     
     # Special formats for links
     LINK = "\033]8;;"  # OSC 8 hyperlink start
