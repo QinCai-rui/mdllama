@@ -37,7 +37,7 @@ Note: If the video does not play, you can download it [here](https://raw.githubu
    ```
 2. Install mdllama:
    ```bash
-   sudo apt install mdllama
+   sudo apt install python3-mdllama
    ```
 
 #### Fedora Installation
