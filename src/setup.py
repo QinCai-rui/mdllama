@@ -8,7 +8,8 @@ setup(
     py_modules=["mdllama"],
     install_requires=[
         "requests",
-        "rich"
+        "rich",
+        "colorama"
     ],
     python_requires=">=3.7",
     entry_points={
