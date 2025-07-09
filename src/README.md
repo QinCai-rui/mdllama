@@ -37,11 +37,14 @@ Note: If the video does not play, you can download it [here](https://raw.githubu
 #### Debian/Ubuntu Installation
 
 1. Add the PPA to your sources list:
+
    ```bash
    echo 'deb [trusted=yes] https://packages.qincai.xyz/debian stable main' | sudo tee /etc/apt/sources.list.d/qincai-mdllama.list
    sudo apt update
    ```
+
 2. Install mdllama:
+
    ```bash
    sudo apt install python3-mdllama
    ```
@@ -52,12 +55,15 @@ Note: If the video does not play, you can download it [here](https://raw.githubu
    [https://packages.qincai.xyz/fedora/](https://packages.qincai.xyz/fedora/)
 
    Or, to install directly:
+
    ```bash
    sudo dnf install https://packages.qincai.xyz/fedora/mdllama-<version>.noarch.rpm
    ```
+
    Replace `<version>` with the latest version number.
 
 2. (Optional, recommended) To enable as a repository for updates, create `/etc/yum.repos.d/qincai-mdllama.repo`:
+
    ```ini
    [qincai-mdllama]
    name=Raymont's Personal RPMs
@@ -65,10 +71,27 @@ Note: If the video does not play, you can download it [here](https://raw.githubu
    enabled=1
    gpgcheck=0
    ```
+
    Then install with:
+
    ```bash
    sudo dnf install mdllama
    ```
+
+3, Install the `ollama` library from pip:
+
+   ```bash
+   pip install ollama
+   ```
+
+   You can also install it globally with:
+
+   ```bash
+   sudo pip install ollama
+   ```
+
+   > [!NOTE]
+   > The `ollama` library is not installed by default in the RPM package since there is no system `ollama` package avaliable (`python3-ollama`). You need to install it manually using pip in order to use `mdllama` with Ollama models.
 
 ---
 
