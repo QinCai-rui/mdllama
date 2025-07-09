@@ -1,4 +1,4 @@
-__version__ = "2.1.5"
+__version__ = "2.2.0-beta1"
 #!/usr/bin/env python3
 """
 mdllama - A command-line interface for Ollama API
