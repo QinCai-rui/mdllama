@@ -1224,71 +1224,77 @@ def main():
             provider=provider
         )
     elif args.command == "models":
-        provider = get_provider(args, cli)
-        # Always try both providers and print both if available
+        # Always try both providers and print both if available, regardless of -p flag
         any_printed = False
-        # Ollama models
+        # --- Ollama models ---
         ollama_models = []
-        if provider == 'ollama' or provider is None:
-            if cli.ollama_client or cli._setup_ollama_client():
+        ollama_error = None
+        if cli.ollama_client or cli._setup_ollama_client():
+            try:
+                response = requests.get(f"{cli.ollama_host}/api/tags")
+                if response.status_code == 200:
+                    models_data = response.json()
+                    ollama_models = [m.get('name', 'Unknown') for m in models_data.get('models', [])]
+            except Exception as e:
+                ollama_error = str(e)
+        # --- OpenAI-compatible models ---
+        openai_models = []
+        openai_error = None
+        openai_api_base = getattr(args, 'openai_api_base', None) or os.environ.get('OPENAI_API_BASE') or cli.config.get('openai_api_base')
+        if openai_api_base:
+            endpoints_to_try = [cli.config.get('openai_model_list_endpoint', None), '/v1/models', '/models', '/model']
+            endpoints_to_try = [e for e in endpoints_to_try if e]
+            for endpoint in endpoints_to_try:
                 try:
-                    response = requests.get(f"{cli.ollama_host}/api/tags")
-                    if response.status_code == 200:
-                        models_data = response.json()
-                        ollama_models = [m.get('name', 'Unknown') for m in models_data.get('models', [])]
-                        if ollama_models:
-                            cli._print_info("Available Ollama models:")
-                            for model_name in ollama_models:
-                                if cli.use_colors:
-                                    print(f"- {Colors.BRIGHT_YELLOW}{model_name}{Colors.RESET}")
-                                else:
-                                    print(f"- {model_name}")
-                            any_printed = True
-                except Exception as e:
-                    cli._print_error(f"Error listing Ollama models: {e}")
-        # OpenAI-compatible models
-        if provider == 'openai' or provider is None:
-            openai_api_base = getattr(args, 'openai_api_base', None) or os.environ.get('OPENAI_API_BASE') or cli.config.get('openai_api_base')
-            if not openai_api_base:
-                cli._print_error("No OpenAI-compatible API base URL provided. Use --openai-api-base or set in config.")
-            else:
-                endpoints_to_try = [cli.config.get('openai_model_list_endpoint', None), '/v1/models', '/models', '/model']
-                endpoints_to_try = [e for e in endpoints_to_try if e]
-                available_models = []
-                for endpoint in endpoints_to_try:
-                    try:
-                        url = openai_api_base.rstrip('/') + endpoint
-                        resp = requests.get(url)
-                        if resp.status_code == 200:
+                    url = openai_api_base.rstrip('/') + endpoint
+                    resp = requests.get(url)
+                    if resp.status_code == 200:
+                        try:
+                            data = resp.json()
+                            if 'data' in data and isinstance(data['data'], list) and data['data']:
+                                openai_models = [m.get('id', '') for m in data.get('data', []) if m.get('id')]
+                            elif 'models' in data and isinstance(data['models'], list) and data['models']:
+                                openai_models = [m for m in data['models'] if m]
+                            elif 'model' in data and isinstance(data['model'], str) and data['model']:
+                                openai_models = [data['model']]
+                        except Exception:
                             try:
-                                data = resp.json()
-                                if 'data' in data and isinstance(data['data'], list) and data['data']:
-                                    available_models = [m.get('id', '') for m in data.get('data', []) if m.get('id')]
-                                elif 'models' in data and isinstance(data['models'], list) and data['models']:
-                                    available_models = [m for m in data['models'] if m]
-                                elif 'model' in data and isinstance(data['model'], str) and data['model']:
-                                    available_models = [data['model']]
+                                text = resp.text.strip()
+                                if text and '\n' not in text and len(text) < 128:
+                                    openai_models = [text]
                             except Exception:
-                                try:
-                                    text = resp.text.strip()
-                                    if text and '\n' not in text and len(text) < 128:
-                                        available_models = [text]
-                                except Exception:
-                                    pass
-                            if available_models:
-                                break
-                    except Exception:
-                        pass
-                if available_models:
-                    cli._print_info("Available OpenAI-compatible models:")
-                    for model in available_models:
-                        if cli.use_colors:
-                            print(f"- {Colors.BRIGHT_YELLOW}{model}{Colors.RESET}")
-                        else:
-                            print(f"- {model}")
-                    any_printed = True
+                                pass
+                        if openai_models:
+                            break
+                except Exception as e:
+                    openai_error = str(e)
+        # --- Output formatting ---
+        if ollama_models:
+            cli._print_info("Available Ollama models:")
+            for model_name in ollama_models:
+                if cli.use_colors:
+                    print(f"- {Colors.BRIGHT_YELLOW}{model_name}{Colors.RESET}")
+                else:
+                    print(f"- {model_name}")
+            any_printed = True
+        elif ollama_error:
+            cli._print_error(f"Error listing Ollama models: {ollama_error}")
+        if openai_models:
+            if any_printed:
+                print()  # Add a blank line between providers
+            cli._print_info("Available OpenAI-compatible models:")
+            for model in openai_models:
+                if cli.use_colors:
+                    print(f"- {Colors.BRIGHT_YELLOW}{model}{Colors.RESET}")
+                else:
+                    print(f"- {model}")
+            any_printed = True
+        elif openai_error:
+            if any_printed:
+                print()
+            cli._print_error(f"Error listing OpenAI-compatible models: {openai_error}")
         if not any_printed:
-            cli._print_error("No models found for the selected provider(s). Please check your configuration.")
+            cli._print_error("No models found for either Ollama or OpenAI-compatible providers. Please check your configuration.")
     elif args.command == "chat":
         # Handle prompt from file if specified
         prompt = args.prompt
