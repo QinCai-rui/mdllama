@@ -1,5 +1,7 @@
 # mdllama
 
+[![Build and Publish mdllama DEB and RPM](https://github.com/QinCai-rui/packages/actions/workflows/build-and-publish-ppa.yml/badge.svg)](https://github.com/QinCai-rui/packages/actions/workflows/build-and-publish-ppa.yml)
+
 A CLI tool that lets you chat with Ollama models right from your terminal, with built-in Markdown rendering.
 
 mdllama makes it easy to interact with Ollama's AI models directly from your command line, meanwhile providing you with real-time Markdown rendering
