@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="mdllama",
-    version="1.1.0",
+    version="1.2.0",
     description="A command-line interface for Ollama API",
     author="QinCai-rui",
     py_modules=["mdllama"],
