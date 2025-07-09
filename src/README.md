@@ -64,6 +64,9 @@ Note: If the video does not play, you can download it [here](https://raw.githubu
    sudo dnf install mdllama
    ```
 
+> [!WARNING]  
+> The Fedora RPM is broken as of now. In the meantime, please install using `pip` or `pipx`. See [#windows--macos-installation](https://github.com/QinCai-rui/mdllama/tree/main?tab=readme-ov-file#windows--macos-installation)
+
 ---
 
 ### Traditional Bash Script Installation (Linux)
