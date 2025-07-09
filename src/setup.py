@@ -8,7 +8,6 @@ setup(
     py_modules=["mdllama"],
     install_requires=[
         "requests",
-        "ollama",
         "rich"
     ],
     python_requires=">=3.7",
