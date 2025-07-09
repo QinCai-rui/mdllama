@@ -16,10 +16,11 @@ Features:
 """
 
 import argparse
+import atexit
 import json
 import os
+import readline
 import sys
-#import readline  # For better input handling (command history)
 from typing import List, Dict, Optional, Union, Any, Literal
 from pathlib import Path
 import datetime
@@ -1157,6 +1158,15 @@ def main():
     load_parser = subparsers.add_parser("load-session", help="Load a conversation session")
     load_parser.add_argument("session_id", help="Session ID to load")
 
+    # Add new subparsers for ollama commands
+    pull_parser = subparsers.add_parser("pull", help="Pull a model from Ollama registry")
+    pull_parser.add_argument("model", help="Model name to pull")
+
+    list_parser = subparsers.add_parser("list", help="List all models in Ollama")
+    ps_parser = subparsers.add_parser("ps", help="Show running model processes in Ollama")
+    rm_parser = subparsers.add_parser("rm", help="Remove a model from Ollama")
+    rm_parser.add_argument("model", help="Model name to remove")
+
     # Parse arguments
     args = parser.parse_args()
 
@@ -1224,14 +1234,12 @@ def main():
             try:
                 for line in resp.iter_lines():
                     if line:
-                        try:
-                            chunk = json.loads(line.decode())
-                            if 'choices' in chunk and chunk['choices']:
-                                delta = chunk['choices'][0].get('delta', {})
-                                if 'content' in delta:
-                                    print(delta['content'], end='', flush=True)
-                        except Exception:
-                            continue
+                        data = json.loads(line.decode())
+                        if 'choices' in data and data['choices']:
+                            delta = data['choices'][0].get('delta', {})
+                            content = delta.get('content', '')
+                            if content:
+                                print(content, end='', flush=True)
                 print()
             except Exception as e:
                 print(f"Streaming error: {e}")
@@ -1256,9 +1264,14 @@ def main():
                 response = requests.get(f"{cli.ollama_host}/api/tags")
                 if response.status_code == 200:
                     models_data = response.json()
-                    ollama_models = [m.get('name', 'Unknown') for m in models_data.get('models', [])]
+                    ollama_models = [model.get('name', 'Unknown') for model in models_data.get('models', [])]
+                else:
+                    ollama_error = f"HTTP {response.status_code}"
             except Exception as e:
                 ollama_error = str(e)
+        else:
+            ollama_error = "Not configured or not running"
+                
         # --- OpenAI-compatible models ---
         openai_models = []
         openai_error = None
@@ -1268,83 +1281,81 @@ def main():
             endpoints_to_try = [e for e in endpoints_to_try if e]
             for endpoint in endpoints_to_try:
                 try:
-                    url = openai_api_base.rstrip('/') + endpoint
-                    resp = requests.get(url)
+                    resp = requests.get(openai_api_base.rstrip('/') + endpoint)
                     if resp.status_code == 200:
-                        try:
-                            data = resp.json()
-                            if 'data' in data and isinstance(data['data'], list) and data['data']:
-                                openai_models = [m.get('id', '') for m in data.get('data', []) if m.get('id')]
-                            elif 'models' in data and isinstance(data['models'], list) and data['models']:
-                                openai_models = [m for m in data['models'] if m]
-                            elif 'model' in data and isinstance(data['model'], str) and data['model']:
-                                openai_models = [data['model']]
-                        except Exception:
-                            try:
-                                text = resp.text.strip()
-                                if text and '\n' not in text and len(text) < 128:
-                                    openai_models = [text]
-                            except Exception:
-                                pass
-                        if openai_models:
-                            break
+                        data = resp.json()
+                        if 'data' in data:
+                            openai_models = [model.get('id', 'Unknown') for model in data['data']]
+                        elif 'models' in data:
+                            openai_models = [model.get('id', 'Unknown') for model in data['models']]
+                        else:
+                            openai_models = list(data.keys()) if isinstance(data, dict) else []
+                        break
+                    elif resp.status_code == 404:
+                        continue
+                    else:
+                        openai_error = f"HTTP {resp.status_code}"
+                        break
                 except Exception as e:
                     openai_error = str(e)
+                    break
+            else:
+                if not openai_error:
+                    openai_error = "No valid model endpoint found"
+                
         # --- Output formatting ---
         if ollama_models:
             cli._print_info("Available Ollama models:")
             for model_name in ollama_models:
-                if cli.use_colors:
+                if use_colors:
                     print(f"- {Colors.BRIGHT_YELLOW}{model_name}{Colors.RESET}")
                 else:
                     print(f"- {model_name}")
             any_printed = True
         elif ollama_error:
-            cli._print_error(f"Error listing Ollama models: {ollama_error}")
+            cli._print_error(f"Ollama models: {ollama_error}")
+            
         if openai_models:
             if any_printed:
-                print()  # Add a blank line between providers
+                print()
             cli._print_info("Available OpenAI-compatible models:")
-            for model in openai_models:
-                if cli.use_colors:
-                    print(f"- {Colors.BRIGHT_YELLOW}{model}{Colors.RESET}")
+            for model_name in openai_models:
+                if use_colors:
+                    print(f"- {Colors.BRIGHT_YELLOW}{model_name}{Colors.RESET}")
                 else:
-                    print(f"- {model}")
+                    print(f"- {model_name}")
             any_printed = True
         elif openai_error:
-            if any_printed:
-                print()
-            cli._print_error(f"Error listing OpenAI-compatible models: {openai_error}")
+            cli._print_error(f"OpenAI-compatible models: {openai_error}")
+            
         if not any_printed:
-            cli._print_error("No models found for either Ollama or OpenAI-compatible providers. Please check your configuration.")
+            cli._print_info("No models available from any provider.")
     elif args.command == "chat":
         # Handle prompt from file if specified
         prompt = args.prompt
         if args.prompt_file:
             try:
                 with open(args.prompt_file, 'r') as f:
-                    prompt = f.read()
+                    prompt = f.read().strip()
             except Exception as e:
                 cli._print_error(f"Error reading prompt file: {e}")
                 return
 
         # If no prompt is provided, read from stdin
         if not prompt:
-            if not sys.stdin.isatty():
-                prompt = sys.stdin.read()
-            else:
-                cli._print_error("No prompt provided. Use --prompt-file or pipe content.")
+            try:
+                prompt = sys.stdin.read().strip()
+            except KeyboardInterrupt:
+                cli._print_error("Interrupted.")
                 return
 
         # Provider selection
         provider = get_provider(args, cli)
         if provider == 'openai':
-            openai_api_base = getattr(args, 'openai_api_base', None) or os.environ.get('OPENAI_API_BASE') or cli.config.get('openai_api_base')
-            if not openai_api_base:
-                cli._print_error("No OpenAI-compatible API base URL provided. Use --openai-api-base or set in config.")
-                return
-            messages = cli._prepare_messages(prompt, args.system)
-            call_openai_chat(messages, model=args.model, stream=args.stream, temperature=args.temperature, max_tokens=args.max_tokens)
+            messages = [{"role": "user", "content": prompt}]
+            if args.system:
+                messages.insert(0, {"role": "system", "content": args.system})
+            call_openai_chat(messages, args.model, args.stream, args.temperature, args.max_tokens)
         else:
             cli.complete(
                 prompt=prompt,
@@ -1358,79 +1369,53 @@ def main():
                 save_history=args.save
             )
     elif args.command == "run":
+        # Interactive mode - determine provider and start
         provider = get_provider(args, cli)
-        openai_api_base = getattr(args, 'openai_api_base', None) or os.environ.get('OPENAI_API_BASE') or cli.config.get('openai_api_base')
-        # --- Model selection logic for -m flag ---
         model = args.model
-        available_models = []
+        
+        # If no model specified, show available models and prompt user to select
         if not model:
-            # If not specified, fetch models and prompt user to select
-            if provider == 'ollama':
-                ollama_host = cli.config.get('ollama_host') or os.environ.get("OLLAMA_HOST") or OLLAMA_DEFAULT_HOST
-                try:
-                    resp = requests.get(f"{ollama_host}/api/tags")
-                    if resp.status_code == 200:
-                        models_data = resp.json()
-                        available_models = [m.get('name', '') for m in models_data.get('models', [])]
-                except Exception:
-                    pass
-            elif provider == 'openai':
-                api_base = openai_api_base
-                endpoints_to_try = [cli.config.get('openai_model_list_endpoint', None), '/v1/models', '/models', '/model']
-                endpoints_to_try = [e for e in endpoints_to_try if e]
-                if not api_base:
-                    print("Error: No OpenAI API base URL set. Please run 'mdllama setup -p openai' or set the OPENAI_API_BASE environment variable.")
-                    return
-                for endpoint in endpoints_to_try:
+            if provider == "ollama":
+                if cli.ollama_client or cli._setup_ollama_client():
                     try:
-                        url = api_base.rstrip('/') + endpoint
-                        resp = requests.get(url)
-                        if resp.status_code == 200:
-                            content_type = resp.headers.get('Content-Type', '')
-                            # Try JSON first
-                            try:
-                                data = resp.json()
-                                # OpenAI format
-                                if 'data' in data and isinstance(data['data'], list) and data['data']:
-                                    available_models = [m.get('id', '') for m in data.get('data', []) if m.get('id')]
-                                # hackclub/ai format: {"models": ["model1", ...]}
-                                elif 'models' in data and isinstance(data['models'], list) and data['models']:
-                                    available_models = [m for m in data['models'] if m]
-                                # hackclub/ai format: {"model": "modelname"}
-                                elif 'model' in data and isinstance(data['model'], str) and data['model']:
-                                    available_models = [data['model']]
-                            except Exception:
-                                # If not JSON, try plain text (e.g. hackclub/ai /model returns just the model name)
+                        response = requests.get(f"{cli.ollama_host}/api/tags")
+                        if response.status_code == 200:
+                            models_data = response.json()
+                            models = models_data.get('models', [])
+                            if models:
+                                cli._print_info("Available models:")
+                                for i, model_info in enumerate(models):
+                                    model_name = model_info.get('name', 'Unknown')
+                                    print(f"{i+1}. {model_name}")
                                 try:
-                                    text = resp.text.strip()
-                                    if text and '\n' not in text and len(text) < 128:
-                                        available_models = [text]
-                                except Exception:
-                                    pass
-                            if available_models:
-                                break
-                    except Exception:
-                        pass
-            if available_models:
-                print("Available models:")
-                for idx, m in enumerate(available_models):
-                    print(f"  [{idx+1}] {m}")
-                while True:
-                    try:
-                        sel = cli._input_with_history("Select a model by number: ").strip()
-                        if sel.isdigit() and 1 <= int(sel) <= len(available_models):
-                            model = available_models[int(sel)-1]
-                            break
+                                    choice = input("Select a model (number or name): ").strip()
+                                    if choice.isdigit():
+                                        idx = int(choice) - 1
+                                        if 0 <= idx < len(models):
+                                            model = models[idx].get('name')
+                                    else:
+                                        model = choice
+                                except (KeyboardInterrupt, EOFError):
+                                    print("\nExiting...")
+                                    return
+                            else:
+                                cli._print_error("No models available")
+                                return
                         else:
-                            print("Invalid selection. Please enter a valid number.")
-                    except (KeyboardInterrupt, EOFError):
-                        print("\nAborted.")
+                            cli._print_error("Failed to get model list")
+                            return
+                    except Exception as e:
+                        cli._print_error(f"Error getting models: {e}")
                         return
+                else:
+                    cli._print_error("Ollama not available")
+                    return
             else:
-                print("No models found for the selected provider. Please check your configuration.")
-                return
+                # For OpenAI, use a default model
+                model = "gpt-3.5-turbo"
+        
         cli.interactive_chat(
-            model=model or "gemma3:1b",
+            model=model,
             system_prompt=args.system,
             temperature=args.temperature,
             max_tokens=args.max_tokens,
@@ -1443,7 +1428,110 @@ def main():
     elif args.command == "sessions":
         cli.list_sessions()
     elif args.command == "load-session":
-        cli.load_history(args.session_id)
+        cli._load_history(args.session_id)
+    elif args.command == "pull":
+        def ollama_pull(model, ollama_host, use_colors=True):
+            import requests, sys, json
+            try:
+                from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn, DownloadColumn, TransferSpeedColumn
+                rich_progress = True
+            except ImportError:
+                rich_progress = False
+            url = f"{ollama_host}/api/pull"
+            resp = requests.post(url, json={"name": model}, stream=True)
+            if resp.status_code != 200:
+                print(f"Error: {resp.status_code} {resp.text}")
+                return
+            if rich_progress:
+                with Progress(
+                    TextColumn("[progress.description]{task.description}"),
+                    BarColumn(),
+                    DownloadColumn(),
+                    TransferSpeedColumn(),
+                    TimeRemainingColumn(),
+                ) as progress:
+                    task = progress.add_task(f"Pulling {model}", total=None)
+                    total = None
+                    completed = 0
+                    for line in resp.iter_lines():
+                        if line:
+                            data = json.loads(line)
+                            if 'status' in data and data['status'] == 'success':
+                                progress.update(task, completed=total or completed)
+                                break
+                            if 'total' in data:
+                                total = data['total']
+                                progress.update(task, total=total)
+                            if 'completed' in data:
+                                completed = data['completed']
+                                progress.update(task, completed=completed)
+                            if 'digest' in data:
+                                progress.update(task, description=f"Pulling {model} [{data['digest'][:12]}]")
+            else:
+                # Simple fallback progress
+                total = None
+                completed = 0
+                for line in resp.iter_lines():
+                    if line:
+                        data = json.loads(line)
+                        if 'status' in data and data['status'] == 'success':
+                            print(f"\nPull complete: {model}")
+                            break
+                        if 'total' in data:
+                            total = data['total']
+                        if 'completed' in data:
+                            completed = data['completed']
+                        if total:
+                            percent = (completed / total) * 100 if total else 0
+                            sys.stdout.write(f"\rPulling {model}: {percent:.1f}% ({completed}/{total})")
+                            sys.stdout.flush()
+                print()
+        ollama_host = cli.config.get('ollama_host') or os.environ.get("OLLAMA_HOST") or OLLAMA_DEFAULT_HOST
+        ollama_pull(args.model, ollama_host, use_colors=use_colors)
+    elif args.command == "list":
+        def ollama_list(ollama_host, use_colors=True):
+            import requests
+            url = f"{ollama_host}/api/tags"
+            resp = requests.get(url)
+            if resp.status_code == 200:
+                data = resp.json()
+                print("Available models:")
+                for model in data.get('models', []):
+                    name = model.get('name', 'Unknown')
+                    size = model.get('size', 0)
+                    if use_colors:
+                        print(f"- {Colors.BRIGHT_YELLOW}{name}{Colors.RESET} ({size} bytes)")
+                    else:
+                        print(f"- {name} ({size} bytes)")
+            else:
+                print(f"Error: {resp.status_code} {resp.text}")
+        ollama_host = cli.config.get('ollama_host') or os.environ.get("OLLAMA_HOST") or OLLAMA_DEFAULT_HOST
+        ollama_list(ollama_host, use_colors=use_colors)
+    elif args.command == "ps":
+        def ollama_ps(ollama_host):
+            import requests
+            url = f"{ollama_host}/api/ps"
+            resp = requests.get(url)
+            if resp.status_code == 200:
+                data = resp.json()
+                print("Running model processes:")
+                for proc in data.get('processes', []):
+                    print(f"- {proc.get('name', 'Unknown')} (PID: {proc.get('pid', '?')})")
+            else:
+                print(f"Error: {resp.status_code} {resp.text}")
+        ollama_host = cli.config.get('ollama_host') or os.environ.get("OLLAMA_HOST") or OLLAMA_DEFAULT_HOST
+        ollama_ps(ollama_host)
+    elif args.command == "rm":
+        def ollama_rm(model, ollama_host):
+            import requests
+            url = f"{ollama_host}/api/delete"
+            resp = requests.delete(url, json={"name": model})
+            if resp.status_code == 200:
+                print(f"Model '{model}' removed successfully.")
+            else:
+                print(f"Error: {resp.status_code} {resp.text}")
+        ollama_host = cli.config.get('ollama_host') or os.environ.get("OLLAMA_HOST") or OLLAMA_DEFAULT_HOST
+        ollama_rm(args.model, ollama_host)
     else:
         # If no command is provided, print help
         parser.print_help()
