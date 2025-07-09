@@ -1,4 +1,4 @@
-__version__ = "2.2.0"
+__version__ = "unknown"
 #!/usr/bin/env python3
 """
 mdllama - A command-line interface for Ollama API
