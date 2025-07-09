@@ -1521,7 +1521,7 @@ def main():
                 
                 # Print header
                 if use_colors:
-                    print(f"{Colors.BOLD}NAME{Colors.RESET:<12} {Colors.BOLD}ID{Colors.RESET:<18} {Colors.BOLD}SIZE{Colors.RESET:<10} {Colors.BOLD}PROCESSOR{Colors.RESET:<8} {Colors.BOLD}UNTIL{Colors.RESET}")
+                    print(f"{Colors.BOLD}NAME{Colors.RESET:<12} {Colors.BOLD}ID{Colors.RESET:<18} {Colors.BOLD}SIZE{Colors.RESET:<9} {Colors.BOLD}PROCESSOR{Colors.RESET:<7} {Colors.BOLD}UNTIL{Colors.RESET}")
                 else:
                     print("NAME         ID              SIZE      PROCESSOR    UNTIL")
                 
