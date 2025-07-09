@@ -1,3 +1,4 @@
+__version__ = "{{VERSION}}"
 #!/usr/bin/env python3
 """
 mdllama - A command-line interface for Ollama API
@@ -979,20 +980,26 @@ class LLM_CLI:
             self._print_success(f"Conversation saved to session {self.current_session_id}")
 
 
+
+
+def get_version():
+    return __version__
+
 def main():
     """Main CLI entrypoint."""
     parser = argparse.ArgumentParser(description="Ollama CLI - A command-line interface for Ollama API")
-    
+    parser.add_argument('--version', action='version', version=f'%(prog)s {get_version()}')
+
     # Create subparsers for different commands
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
-    
+
     # Setup command
     setup_parser = subparsers.add_parser("setup", help="Set up the CLI with Ollama configuration")
     setup_parser.add_argument("--ollama-host", help="Ollama host URL")
-    
+
     # List models command
     subparsers.add_parser("models", help="List available models")
-    
+
     # Chat completion command
     chat_parser = subparsers.add_parser("chat", help="Generate a chat completion")
     chat_parser.add_argument("prompt", help="The prompt to send to the API", nargs="?")
@@ -1007,10 +1014,10 @@ def main():
     chat_parser.add_argument("--save", action="store_true", help="Save conversation history")
     chat_parser.add_argument("--no-color", action="store_true", help="Disable colored output")
     chat_parser.add_argument("--render-markdown", "-r", action="store_true", help="Render markdown in the response")
-    
+
     # File with prompt content
     chat_parser.add_argument("--prompt-file", help="Path to file containing the prompt")
-    
+
     # Interactive chat command
     interactive_parser = subparsers.add_parser("run", help="Start an interactive chat session")
     interactive_parser.add_argument("--model", "-m", default="gemma3:1b", 
@@ -1021,18 +1028,18 @@ def main():
     interactive_parser.add_argument("--save", action="store_true", help="Save conversation history")
     interactive_parser.add_argument("--no-color", action="store_true", help="Disable colored output")
     interactive_parser.add_argument("--render-markdown", "-r", action="store_true", help="Render markdown in the response")
-    
+
     # Context and history management
     subparsers.add_parser("clear-context", help="Clear the current conversation context")
-    
+
     # Session management
     subparsers.add_parser("sessions", help="List available conversation sessions")
     load_parser = subparsers.add_parser("load-session", help="Load a conversation session")
     load_parser.add_argument("session_id", help="Session ID to load")
-    
+
     # Parse arguments
     args = parser.parse_args()
-    
+
     # Determine if colors should be used
     use_colors = True
     if hasattr(args, 'no_color') and args.no_color:
@@ -1040,20 +1047,20 @@ def main():
     # Also check if NO_COLOR environment variable is set (common standard)
     if os.environ.get('NO_COLOR') is not None:
         use_colors = False
-        
+
     # Initialize CLI
     render_markdown = False
     if hasattr(args, 'render_markdown') and args.render_markdown:
         render_markdown = True
-        
+
     # Check if Rich is available when markdown rendering is requested
     if render_markdown and not RICH_AVAILABLE:
         print("Warning: Rich library not available. Install it with: pip install rich")
         print("Markdown rendering will be disabled.")
         render_markdown = False
-    
+
     cli = LLM_CLI(use_colors=use_colors, render_markdown=render_markdown)
-    
+
     # Handle commands
     if args.command == "setup":
         cli.setup(args.ollama_host)
@@ -1069,7 +1076,7 @@ def main():
             except Exception as e:
                 cli._print_error(f"Error reading prompt file: {e}")
                 return
-        
+
         # If no prompt is provided, read from stdin
         if not prompt:
             if not sys.stdin.isatty():
@@ -1077,7 +1084,7 @@ def main():
             else:
                 cli._print_error("No prompt provided. Use --prompt-file or pipe content.")
                 return
-        
+
         cli.complete(
             prompt=prompt,
             model=args.model,
