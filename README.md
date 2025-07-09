@@ -54,7 +54,7 @@ Note: If the video does not play, you can download it [here](https://raw.githubu
 2. (Optional, recommended) To enable as a repository for updates, create `/etc/yum.repos.d/qincai-mdllama.repo`:
    ```ini
    [qincai-mdllama]
-   name=QinCai mdllama RPMs
+   name=Raymont mdllama RPMs
    baseurl=https://packages.qincai.xyz/fedora/
    enabled=1
    gpgcheck=0
