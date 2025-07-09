@@ -229,28 +229,62 @@ class LLM_CLI:
             else:
                 print(formatted_text)
 
-    def setup(self, ollama_host: Optional[str] = None):
-        """Set up the CLI with Ollama configuration."""
+    def setup(self, ollama_host: Optional[str] = None, openai_api_base: Optional[str] = None, provider: str = "ollama"):
+        """Set up the CLI with Ollama or OpenAI-compatible configuration."""
         self._print_info("Setting up mdllama...")
-        
-        # Ollama setup
-        if ollama_host:
-            self.config['ollama_host'] = ollama_host
-        else:
-            ollama_host = input(f"Enter your Ollama host URL (leave empty for default: {OLLAMA_DEFAULT_HOST}): ").strip()
+        provider = provider.lower()
+        if provider == "ollama":
+            # Ollama setup
             if ollama_host:
                 self.config['ollama_host'] = ollama_host
-                
-        self._save_config()
-        
-        # Test connection
-        ollama_success = self._setup_ollama_client()
-        
-        if ollama_success:
-            self._print_success("Ollama connected successfully!")
-            self._print_success("Setup complete!")
+            else:
+                ollama_host = input(f"Enter your Ollama host URL (leave empty for default: {OLLAMA_DEFAULT_HOST}): ").strip()
+                if ollama_host:
+                    self.config['ollama_host'] = ollama_host
+            self._save_config()
+            # Test connection
+            ollama_success = self._setup_ollama_client()
+            if ollama_success:
+                self._print_success("Ollama connected successfully!")
+                self._print_success("Setup complete!")
+            else:
+                self._print_error("Ollama not configured or connection failed. Please check your settings.")
+        elif provider == "openai":
+            # OpenAI-compatible setup
+            if openai_api_base:
+                self.config['openai_api_base'] = openai_api_base
+            else:
+                openai_api_base = input("Enter your OpenAI-compatible API base URL (e.g. https://ai.hackclub.com): ").strip()
+                if openai_api_base:
+                    self.config['openai_api_base'] = openai_api_base
+            self._save_config()
+            # Test connection: try /v1/models, then /models, then /model (for hackclub/ai)
+            test_url = self.config.get('openai_api_base', openai_api_base)
+            if test_url:
+                endpoints_to_try = ["/v1/models", "/models", "/model"]
+                for endpoint in endpoints_to_try:
+                    try:
+                        resp = requests.get(test_url.rstrip('/') + endpoint)
+                        if resp.status_code == 200:
+                            self._print_success(f"OpenAI-compatible endpoint connected successfully using '{endpoint}'!")
+                            self.config['openai_model_list_endpoint'] = endpoint
+                            self._save_config()
+                            self._print_success("Setup complete!")
+                            break
+                        elif resp.status_code == 404:
+                            continue
+                        else:
+                            self._print_error(f"OpenAI-compatible endpoint error at {endpoint}: HTTP {resp.status_code}")
+                            break
+                    except Exception as e:
+                        self._print_error(f"Error connecting to OpenAI-compatible endpoint at {endpoint}: {e}")
+                        break
+                else:
+                    self._print_error("Could not connect to any known model listing endpoint (/v1/models, /models, /model). Please check your API base URL.")
+            else:
+                self._print_error("No OpenAI-compatible API base URL provided.")
         else:
-            self._print_error("Ollama not configured or connection failed. Please check your settings.")
+            self._print_error(f"Unknown provider: {provider}. Use 'ollama' or 'openai'.")
 
     def list_models(self):
         """List available models from Ollama."""
@@ -832,29 +866,29 @@ class LLM_CLI:
         system_prompt: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
-        save_history: bool = False
+        save_history: bool = False,
+        provider: str = "ollama",
+        openai_api_base: Optional[str] = None
     ):
-        """Start an interactive chat session."""
-        
-        if not self._ensure_client():
-            return
-            
+        """Start an interactive chat session for the selected provider, with unified UI."""
+        provider = provider.lower() if provider else "ollama"
         # Print header with model info and date/time
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
+        display_model = model
+        # For openai, always display the selected model (from -m or prompt)
+        # This ensures the UI header matches the user's selection
         if self.use_colors:
             print(f"{Colors.BG_BLUE}{Colors.WHITE} mdllama {Colors.RESET}")
-            print(f"{Colors.BRIGHT_CYAN}Model:{Colors.RESET} {Colors.BRIGHT_YELLOW}{model}{Colors.RESET}")
+            print(f"{Colors.BRIGHT_CYAN}Model:{Colors.RESET} {Colors.BRIGHT_YELLOW}{display_model}{Colors.RESET}")
             print(f"{Colors.BRIGHT_CYAN}Time: {Colors.RESET}{Colors.WHITE}{current_time}{Colors.RESET}")
             print(f"{Colors.BRIGHT_CYAN}User: {Colors.RESET}{Colors.WHITE}{os.environ.get('USER', 'unknown')}{Colors.RESET}")
             print()
         else:
             print("mdllama")
-            print(f"Model: {model}")
+            print(f"Model: {display_model}")
             print(f"Time: {current_time}")
             print(f"User: {os.environ.get('USER', 'unknown')}")
             print()
-        
         # Print help information
         self._print_info("Interactive chat commands:")
         self._print_command("exit/quit      - End the conversation")
@@ -865,40 +899,45 @@ class LLM_CLI:
         self._print_command("model:<name>   - Switch to a different model")
         self._print_command("\"\"\"           - Start/end a multiline message")
         print()
-        
         # Add system prompt if provided
+        context = []
         if system_prompt:
-            self.current_context.append({"role": "system", "content": system_prompt})
+            context.append({"role": "system", "content": system_prompt})
             if self.use_colors:
                 print(f"{Colors.MAGENTA}System:{Colors.RESET} {system_prompt}")
             else:
                 print(f"System: {system_prompt}")
             print()
-            
+        # For Ollama, use self.current_context; for OpenAI, use local context
+        if provider == "ollama":
+            self.current_context = context.copy()
+        else:
+            # For OpenAI, context is local to this function
+            pass
         try:
             while True:
-                # Get user input
                 try:
                     if self.use_colors:
                         user_input = input(f"{Colors.BOLD}{Colors.BLUE}You:{Colors.RESET} ")
                     else:
                         user_input = input("You: ")
-                except EOFError:  # Handle Ctrl+D
+                except EOFError:
                     print("\nExiting interactive chat...")
                     break
-                
                 # Check for special commands
                 if user_input.lower() in ['exit', 'quit']:
                     print("Exiting interactive chat...")
                     break
-                    
                 elif user_input.lower() == 'clear':
-                    self.clear_context()
-                    # Re-add system prompt if it was set
-                    if system_prompt:
-                        self.current_context.append({"role": "system", "content": system_prompt})
+                    if provider == "ollama":
+                        self.clear_context()
+                        if system_prompt:
+                            self.current_context.append({"role": "system", "content": system_prompt})
+                    else:
+                        context = []
+                        if system_prompt:
+                            context.append({"role": "system", "content": system_prompt})
                     continue
-                    
                 elif user_input.startswith('file:'):
                     file_path = user_input[5:].strip()
                     try:
@@ -910,25 +949,31 @@ class LLM_CLI:
                                 user_input = input(f"{Colors.BOLD}{Colors.BLUE}You:{Colors.RESET} ")
                             else:
                                 user_input = input("You: ")
-                            # Append file content to the user input
                             user_input += f"\n\nContents of {file_name}:\n```\n{file_content}\n```"
                     except Exception as e:
                         self._print_error(f"Error reading file: {e}")
                         continue
-                
                 elif user_input.startswith('system:'):
                     new_system_prompt = user_input[7:].strip()
-                    # Remove any existing system prompts
-                    self.current_context = [msg for msg in self.current_context if msg.get("role") != "system"]
-                    # Add the new system prompt
-                    if new_system_prompt:
-                        self.current_context.append({"role": "system", "content": new_system_prompt})
-                        system_prompt = new_system_prompt
-                        self._print_success("System prompt updated.")
+                    if provider == "ollama":
+                        self.current_context = [msg for msg in self.current_context if msg.get("role") != "system"]
+                        if new_system_prompt:
+                            self.current_context.append({"role": "system", "content": new_system_prompt})
+                            system_prompt = new_system_prompt
+                            self._print_success("System prompt updated.")
+                        else:
+                            system_prompt = None
+                            self._print_info("System prompt cleared.")
                     else:
-                        self._print_info("System prompt cleared.")
+                        context = [msg for msg in context if msg.get("role") != "system"]
+                        if new_system_prompt:
+                            context.append({"role": "system", "content": new_system_prompt})
+                            system_prompt = new_system_prompt
+                            self._print_success("System prompt updated.")
+                        else:
+                            system_prompt = None
+                            self._print_info("System prompt cleared.")
                     continue
-                    
                 elif user_input.startswith('temp:'):
                     try:
                         temperature = float(user_input[5:].strip())
@@ -936,7 +981,6 @@ class LLM_CLI:
                     except ValueError:
                         self._print_error("Invalid temperature value. Please use a number between 0 and 1.")
                     continue
-                    
                 elif user_input.startswith('model:'):
                     new_model = user_input[6:].strip()
                     if new_model:
@@ -945,37 +989,61 @@ class LLM_CLI:
                     else:
                         self._print_error("Please specify a model name.")
                     continue
-                
-                # Handle multiline input
                 elif user_input.strip() == '"""':
                     user_input = self.read_multiline_input()
                     self._print_success("Multiline input received")
-                    
-                # Skip empty inputs
                 if not user_input.strip():
                     continue
-                
-                # Process regular user input
                 if self.use_colors:
                     print(f"\n{Colors.BOLD}{Colors.GREEN}Assistant:{Colors.RESET}")
                 else:
                     print("\nAssistant:")
-                    
-                self.complete(
-                    prompt=user_input,
-                    model=model,
-                    stream=True,  # Always stream in interactive mode
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    keep_context=True,
-                    save_history=False  # Don't save after each message
-                )
-                
+                if provider == "ollama":
+                    self.complete(
+                        prompt=user_input,
+                        model=model,
+                        stream=True,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        keep_context=True,
+                        save_history=False
+                    )
+                else:
+                    context.append({"role": "user", "content": user_input})
+                    url = (openai_api_base or self.config.get('openai_api_base', '')).rstrip('/') + "/chat/completions"
+                    payload = {
+                        "model": model,
+                        "messages": context,
+                        "stream": True,
+                        "temperature": temperature
+                    }
+                    if max_tokens:
+                        payload["max_tokens"] = max_tokens
+                    headers = {"Content-Type": "application/json"}
+                    try:
+                        resp = requests.post(url, json=payload, headers=headers, stream=True)
+                        full_response = ""
+                        for line in resp.iter_lines():
+                            if line:
+                                try:
+                                    chunk = json.loads(line.decode())
+                                    if 'choices' in chunk and chunk['choices']:
+                                        delta = chunk['choices'][0].get('delta', {})
+                                        content = delta.get('content', '')
+                                        if content:
+                                            full_response += content
+                                except Exception:
+                                    continue
+                        if self.render_markdown and RICH_AVAILABLE and self.console:
+                            print()  # Ensure markdown starts on a new line
+                            self.console.print(Markdown(full_response))
+                        else:
+                            print(full_response)
+                    except Exception as e:
+                        print(f"[OpenAI-compatible error: {e}]")
         except KeyboardInterrupt:
             print("\nInterrupted. Exiting interactive chat...")
-        
-        # Save the final conversation if requested
-        if save_history and self.current_context:
+        if save_history and provider == "ollama" and self.current_context:
             self._save_history(self.current_context)
             self._print_success(f"Conversation saved to session {self.current_session_id}")
 
@@ -985,26 +1053,34 @@ class LLM_CLI:
 def get_version():
     return __version__
 
+
 def main():
     """Main CLI entrypoint."""
-    parser = argparse.ArgumentParser(description="mdllama - A command-line interface for Ollama API")
+    parser = argparse.ArgumentParser(description="mdllama - A command-line interface for Ollama API and OpenAI-compatible endpoints")
     parser.add_argument('--version', action='version', version=f'%(prog)s {get_version()}')
+
+    # Add provider and OpenAI-compatible endpoint option
+    parser.add_argument('-p', '--provider', choices=['ollama', 'openai'], default=None, help='Provider to use: ollama or openai (default: ollama)')
+    parser.add_argument('--openai-api-base', help='OpenAI-compatible API base URL (e.g. https://ai.hackclub.com)', default=None)
 
     # Create subparsers for different commands
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
 
     # Setup command
-    setup_parser = subparsers.add_parser("setup", help="Set up the CLI with Ollama configuration")
+    setup_parser = subparsers.add_parser("setup", help="Set up the CLI with Ollama or OpenAI-compatible configuration")
+    setup_parser.add_argument("-p", "--provider", choices=["ollama", "openai"], default=None, help="Provider to set up: ollama or openai (default: ollama)")
     setup_parser.add_argument("--ollama-host", help="Ollama host URL")
+    setup_parser.add_argument("--openai-api-base", help="OpenAI-compatible API base URL (e.g. https://ai.hackclub.com)")
 
     # List models command
-    subparsers.add_parser("models", help="List available models")
+    models_parser = subparsers.add_parser("models", help="List available models")
+    models_parser.add_argument("-p", "--provider", choices=["ollama", "openai"], default=None, help="Provider to use: ollama or openai (default: ollama)")
+    models_parser.add_argument("--openai-api-base", help=argparse.SUPPRESS)
 
     # Chat completion command
     chat_parser = subparsers.add_parser("chat", help="Generate a chat completion")
     chat_parser.add_argument("prompt", help="The prompt to send to the API", nargs="?")
-    chat_parser.add_argument("--model", "-m", default="gemma3:1b", 
-                            help="Model to use for completion")
+    chat_parser.add_argument("--model", "-m", default="gemma3:1b", help="Model to use for completion")
     chat_parser.add_argument("--stream", "-s", action="store_true", help="Stream the response")
     chat_parser.add_argument("--system", help="System prompt to use")
     chat_parser.add_argument("--temperature", "-t", type=float, default=0.7, help="Temperature for sampling")
@@ -1014,20 +1090,22 @@ def main():
     chat_parser.add_argument("--save", action="store_true", help="Save conversation history")
     chat_parser.add_argument("--no-color", action="store_true", help="Disable colored output")
     chat_parser.add_argument("--render-markdown", "-r", action="store_true", help="Render markdown in the response")
-
+    chat_parser.add_argument("-p", "--provider", choices=["ollama", "openai"], default=None, help="Provider to use: ollama or openai (default: ollama)")
+    chat_parser.add_argument("--openai-api-base", help=argparse.SUPPRESS)  # allow override per-command
     # File with prompt content
     chat_parser.add_argument("--prompt-file", help="Path to file containing the prompt")
 
     # Interactive chat command
     interactive_parser = subparsers.add_parser("run", help="Start an interactive chat session")
-    interactive_parser.add_argument("--model", "-m", default="gemma3:1b", 
-                                  help="Model to use for completion")
+    interactive_parser.add_argument("--model", "-m", default=None, help="Model to use for completion (if not specified, will prompt to select)")
     interactive_parser.add_argument("--system", "-s", help="System prompt to use")
     interactive_parser.add_argument("--temperature", "-t", type=float, default=0.7, help="Temperature for sampling")
     interactive_parser.add_argument("--max-tokens", type=int, help="Maximum number of tokens to generate")
     interactive_parser.add_argument("--save", action="store_true", help="Save conversation history")
     interactive_parser.add_argument("--no-color", action="store_true", help="Disable colored output")
     interactive_parser.add_argument("--render-markdown", "-r", action="store_true", help="Render markdown in the response")
+    interactive_parser.add_argument("-p", "--provider", choices=["ollama", "openai"], default=None, help="Provider to use: ollama or openai (default: ollama)")
+    interactive_parser.add_argument("--openai-api-base", help=argparse.SUPPRESS)
 
     # Context and history management
     subparsers.add_parser("clear-context", help="Clear the current conversation context")
@@ -1059,13 +1137,94 @@ def main():
         print("Markdown rendering will be disabled.")
         render_markdown = False
 
+    # Determine OpenAI-compatible API base
+    openai_api_base = getattr(args, 'openai_api_base', None)
+    if not openai_api_base:
+        openai_api_base = os.environ.get('OPENAI_API_BASE')
+
     cli = LLM_CLI(use_colors=use_colors, render_markdown=render_markdown)
+
+    def get_provider(args, cli):
+        # Prefer explicit argument, then config, then default to 'ollama'
+        provider = getattr(args, 'provider', None)
+        if provider:
+            return provider
+        if hasattr(cli, 'config') and 'provider' in cli.config:
+            return cli.config['provider']
+        return 'ollama'
+
+    def call_openai_chat(messages, model="meta-llama/llama-4-maverick-17b-128e-instruct", stream=False, temperature=0.7, max_tokens=None):
+        url = (openai_api_base or os.environ.get('OPENAI_API_BASE', '')).rstrip('/') + "/chat/completions"
+        payload = {
+            "model": model,
+            "messages": messages,
+            "stream": stream,
+            "temperature": temperature
+        }
+        if max_tokens:
+            payload["max_tokens"] = max_tokens
+        headers = {"Content-Type": "application/json"}
+        if stream:
+            resp = requests.post(url, json=payload, headers=headers, stream=True)
+        else:
+            resp = requests.post(url, json=payload, headers=headers, stream=False)
+        if not stream:
+            if resp.status_code == 200:
+                data = resp.json()
+                content = data["choices"][0]["message"]["content"]
+                print(content)
+                return content
+            else:
+                print(f"Error: {resp.status_code} {resp.text}")
+                return None
+        else:
+            # Streamed response: application/x-ndjson, each line is a JSON object
+            try:
+                for line in resp.iter_lines():
+                    if line:
+                        try:
+                            chunk = json.loads(line.decode())
+                            if 'choices' in chunk and chunk['choices']:
+                                delta = chunk['choices'][0].get('delta', {})
+                                if 'content' in delta:
+                                    print(delta['content'], end='', flush=True)
+                        except Exception:
+                            continue
+                print()
+            except Exception as e:
+                print(f"Streaming error: {e}")
+            return None
 
     # Handle commands
     if args.command == "setup":
-        cli.setup(args.ollama_host)
+        provider = get_provider(args, cli)
+        cli.setup(
+            ollama_host=getattr(args, 'ollama_host', None),
+            openai_api_base=getattr(args, 'openai_api_base', None),
+            provider=provider
+        )
     elif args.command == "models":
-        cli.list_models()
+        provider = get_provider(args, cli)
+        if provider == 'openai':
+            # List models from OpenAI-compatible endpoint
+            openai_api_base = getattr(args, 'openai_api_base', None) or os.environ.get('OPENAI_API_BASE') or cli.config.get('openai_api_base')
+            if not openai_api_base:
+                cli._print_error("No OpenAI-compatible API base URL provided. Use --openai-api-base or set in config.")
+                return
+            try:
+                resp = requests.get(openai_api_base.rstrip('/') + "/models")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    cli._print_info("Available OpenAI-compatible models:")
+                    for model in data.get('data', []):
+                        model_id = model.get('id', 'Unknown')
+                        print(f"- {model_id}")
+                else:
+                    cli._print_error(f"Error listing models: HTTP {resp.status_code} {resp.text}")
+            except Exception as e:
+                cli._print_error(f"Error listing models: {e}")
+        else:
+            cli.list_models()
     elif args.command == "chat":
         # Handle prompt from file if specified
         prompt = args.prompt
@@ -1085,25 +1244,107 @@ def main():
                 cli._print_error("No prompt provided. Use --prompt-file or pipe content.")
                 return
 
-        cli.complete(
-            prompt=prompt,
-            model=args.model,
-            stream=args.stream,
-            system_prompt=args.system,
-            temperature=args.temperature,
-            max_tokens=args.max_tokens,
-            file_paths=args.file,
-            keep_context=args.context,
-            save_history=args.save
-        )
+        # Provider selection
+        provider = get_provider(args, cli)
+        if provider == 'openai':
+            openai_api_base = getattr(args, 'openai_api_base', None) or os.environ.get('OPENAI_API_BASE') or cli.config.get('openai_api_base')
+            if not openai_api_base:
+                cli._print_error("No OpenAI-compatible API base URL provided. Use --openai-api-base or set in config.")
+                return
+            messages = cli._prepare_messages(prompt, args.system)
+            call_openai_chat(messages, model=args.model, stream=args.stream, temperature=args.temperature, max_tokens=args.max_tokens)
+        else:
+            cli.complete(
+                prompt=prompt,
+                model=args.model,
+                stream=args.stream,
+                system_prompt=args.system,
+                temperature=args.temperature,
+                max_tokens=args.max_tokens,
+                file_paths=args.file,
+                keep_context=args.context,
+                save_history=args.save
+            )
     elif args.command == "run":
-        # Interactive chat mode
+        provider = get_provider(args, cli)
+        openai_api_base = getattr(args, 'openai_api_base', None) or os.environ.get('OPENAI_API_BASE') or cli.config.get('openai_api_base')
+        # --- Model selection logic for -m flag ---
+        model = args.model
+        available_models = []
+        if not model:
+            # If not specified, fetch models and prompt user to select
+            if provider == 'ollama':
+                ollama_host = cli.config.get('ollama_host') or os.environ.get("OLLAMA_HOST") or OLLAMA_DEFAULT_HOST
+                try:
+                    resp = requests.get(f"{ollama_host}/api/tags")
+                    if resp.status_code == 200:
+                        models_data = resp.json()
+                        available_models = [m.get('name', '') for m in models_data.get('models', [])]
+                except Exception:
+                    pass
+            elif provider == 'openai':
+                api_base = openai_api_base
+                endpoints_to_try = [cli.config.get('openai_model_list_endpoint', None), '/v1/models', '/models', '/model']
+                endpoints_to_try = [e for e in endpoints_to_try if e]
+                if not api_base:
+                    print("Error: No OpenAI API base URL set. Please run 'mdllama setup -p openai' or set the OPENAI_API_BASE environment variable.")
+                    return
+                for endpoint in endpoints_to_try:
+                    try:
+                        url = api_base.rstrip('/') + endpoint
+                        resp = requests.get(url)
+                        if resp.status_code == 200:
+                            content_type = resp.headers.get('Content-Type', '')
+                            # Try JSON first
+                            try:
+                                data = resp.json()
+                                # OpenAI format
+                                if 'data' in data and isinstance(data['data'], list) and data['data']:
+                                    available_models = [m.get('id', '') for m in data.get('data', []) if m.get('id')]
+                                # hackclub/ai format: {"models": ["model1", ...]}
+                                elif 'models' in data and isinstance(data['models'], list) and data['models']:
+                                    available_models = [m for m in data['models'] if m]
+                                # hackclub/ai format: {"model": "modelname"}
+                                elif 'model' in data and isinstance(data['model'], str) and data['model']:
+                                    available_models = [data['model']]
+                            except Exception:
+                                # If not JSON, try plain text (e.g. hackclub/ai /model returns just the model name)
+                                try:
+                                    text = resp.text.strip()
+                                    if text and '\n' not in text and len(text) < 128:
+                                        available_models = [text]
+                                except Exception:
+                                    pass
+                            if available_models:
+                                break
+                    except Exception:
+                        pass
+            if available_models:
+                print("Available models:")
+                for idx, m in enumerate(available_models):
+                    print(f"  [{idx+1}] {m}")
+                while True:
+                    try:
+                        sel = input("Select a model by number: ").strip()
+                        if sel.isdigit() and 1 <= int(sel) <= len(available_models):
+                            model = available_models[int(sel)-1]
+                            break
+                        else:
+                            print("Invalid selection. Please enter a valid number.")
+                    except (KeyboardInterrupt, EOFError):
+                        print("\nAborted.")
+                        return
+            else:
+                print("No models found for the selected provider. Please check your configuration.")
+                return
         cli.interactive_chat(
-            model=args.model,
+            model=model or "gemma3:1b",
             system_prompt=args.system,
             temperature=args.temperature,
             max_tokens=args.max_tokens,
-            save_history=args.save
+            save_history=args.save,
+            provider=provider,
+            openai_api_base=openai_api_base
         )
     elif args.command == "clear-context":
         cli.clear_context()
