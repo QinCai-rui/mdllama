@@ -54,7 +54,7 @@ Note: If the video does not play, you can download it [here](https://raw.githubu
 2. (Optional, recommended) To enable as a repository for updates, create `/etc/yum.repos.d/qincai-mdllama.repo`:
    ```ini
    [qincai-mdllama]
-   name=Raymont mdllama RPMs
+   name=Raymont's Personal RPMs
    baseurl=https://packages.qincai.xyz/fedora/
    enabled=1
    gpgcheck=0
@@ -63,9 +63,6 @@ Note: If the video does not play, you can download it [here](https://raw.githubu
    ```bash
    sudo dnf install mdllama
    ```
-
-> [!WARNING]  
-> The Fedora RPM is broken as of now. In the meantime, please install using `pip` or `pipx`. See [#windows--macos-installation](https://github.com/QinCai-rui/mdllama/tree/main?tab=readme-ov-file#windows--macos-installation)
 
 ---
 
