@@ -88,6 +88,20 @@ class Colors:
     LINK_END = "\033]8;;\033\\"  # OSC 8 hyperlink end
 
 
+try:
+    import readline
+    import atexit
+    READLINE_AVAILABLE = True
+    HISTORY_FILE = str(CONFIG_DIR / "input_history")
+    if not CONFIG_DIR.exists():
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    if os.path.exists(HISTORY_FILE):
+        readline.read_history_file(HISTORY_FILE)
+    atexit.register(lambda: readline.write_history_file(HISTORY_FILE))
+    readline.set_history_length(1000)
+except ImportError:
+    READLINE_AVAILABLE = False
+
 class LLM_CLI:
     def __init__(self, 
                  use_colors=True, 
@@ -98,14 +112,19 @@ class LLM_CLI:
         self.render_markdown = render_markdown
         self.current_context: List[Dict[str, Any]] = []
         self.current_session_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # Initialize rich console if available
         self.console = Console() if RICH_AVAILABLE else None
-        
-        # URL detection regex
         self.url_pattern = re.compile(
             r'https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+(?:/[-\w%!$&\'()*+,;=:@/~]+)*(?:\?[-\w%!$&\'()*+,;=:@/~]*)?(?:#[-\w%!$&\'()*+,;=:@/~]*)?'
         )
+
+    def _input_with_history(self, prompt):
+        if READLINE_AVAILABLE:
+            try:
+                return input(prompt)
+            except KeyboardInterrupt:
+                raise
+        else:
+            return input(prompt)
 
     def _setup_ollama_client(self):
         """Initialize the Ollama client."""
@@ -918,9 +937,9 @@ class LLM_CLI:
             while True:
                 try:
                     if self.use_colors:
-                        user_input = input(f"{Colors.BOLD}{Colors.BLUE}You:{Colors.RESET} ")
+                        user_input = self._input_with_history(f"{Colors.BOLD}{Colors.BLUE}You:{Colors.RESET} ")
                     else:
-                        user_input = input("You: ")
+                        user_input = self._input_with_history("You: ")
                 except EOFError:
                     print("\nExiting interactive chat...")
                     break
@@ -946,9 +965,9 @@ class LLM_CLI:
                             file_name = Path(file_path).name
                             self._print_success(f"File '{file_name}' loaded. Include it in your next message.")
                             if self.use_colors:
-                                user_input = input(f"{Colors.BOLD}{Colors.BLUE}You:{Colors.RESET} ")
+                                user_input = self._input_with_history(f"{Colors.BOLD}{Colors.BLUE}You:{Colors.RESET} ")
                             else:
-                                user_input = input("You: ")
+                                user_input = self._input_with_history("You: ")
                             user_input += f"\n\nContents of {file_name}:\n```\n{file_content}\n```"
                     except Exception as e:
                         self._print_error(f"Error reading file: {e}")
@@ -1395,7 +1414,7 @@ def main():
                     print(f"  [{idx+1}] {m}")
                 while True:
                     try:
-                        sel = input("Select a model by number: ").strip()
+                        sel = cli._input_with_history("Select a model by number: ").strip()
                         if sel.isdigit() and 1 <= int(sel) <= len(available_models):
                             model = available_models[int(sel)-1]
                             break
