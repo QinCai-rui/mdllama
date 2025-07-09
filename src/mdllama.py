@@ -1023,22 +1023,42 @@ class LLM_CLI:
                     try:
                         resp = requests.post(url, json=payload, headers=headers, stream=True)
                         full_response = ""
-                        for line in resp.iter_lines():
-                            if line:
-                                try:
-                                    chunk = json.loads(line.decode())
-                                    if 'choices' in chunk and chunk['choices']:
-                                        delta = chunk['choices'][0].get('delta', {})
-                                        content = delta.get('content', '')
-                                        if content:
-                                            full_response += content
-                                except Exception:
-                                    continue
                         if self.render_markdown and RICH_AVAILABLE and self.console:
-                            print()  # Ensure markdown starts on a new line
-                            self.console.print(Markdown(full_response))
+                            # Live markdown streaming for OpenAI-compatible endpoints
+                            accumulated_text = ""
+                            with Live(Markdown(""), console=self.console, refresh_per_second=10) as live_display:
+                                for line in resp.iter_lines():
+                                    if line:
+                                        try:
+                                            chunk = json.loads(line.decode())
+                                            if 'choices' in chunk and chunk['choices']:
+                                                delta = chunk['choices'][0].get('delta', {})
+                                                content = delta.get('content', '')
+                                                if content:
+                                                    full_response += content
+                                                    accumulated_text += content
+                                                    try:
+                                                        live_display.update(Markdown(accumulated_text))
+                                                    except Exception:
+                                                        live_display.update(accumulated_text)
+                                        except Exception:
+                                            continue
+                            print()
                         else:
-                            print(full_response)
+                            # Plain streaming (no markdown)
+                            for line in resp.iter_lines():
+                                if line:
+                                    try:
+                                        chunk = json.loads(line.decode())
+                                        if 'choices' in chunk and chunk['choices']:
+                                            delta = chunk['choices'][0].get('delta', {})
+                                            content = delta.get('content', '')
+                                            if content:
+                                                print(content, end='', flush=True)
+                                                full_response += content
+                                    except Exception:
+                                        continue
+                            print()
                     except Exception as e:
                         print(f"[OpenAI-compatible error: {e}]")
         except KeyboardInterrupt:
