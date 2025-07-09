@@ -231,7 +231,7 @@ class LLM_CLI:
 
     def setup(self, ollama_host: Optional[str] = None):
         """Set up the CLI with Ollama configuration."""
-        self._print_info("Setting up Ollama CLI...")
+        self._print_info("Setting up mdllama...")
         
         # Ollama setup
         if ollama_host:
@@ -843,13 +843,13 @@ class LLM_CLI:
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         if self.use_colors:
-            print(f"{Colors.BG_BLUE}{Colors.WHITE} OLLAMA CLI {Colors.RESET}")
+            print(f"{Colors.BG_BLUE}{Colors.WHITE} mdllama {Colors.RESET}")
             print(f"{Colors.BRIGHT_CYAN}Model:{Colors.RESET} {Colors.BRIGHT_YELLOW}{model}{Colors.RESET}")
             print(f"{Colors.BRIGHT_CYAN}Time: {Colors.RESET}{Colors.WHITE}{current_time}{Colors.RESET}")
             print(f"{Colors.BRIGHT_CYAN}User: {Colors.RESET}{Colors.WHITE}{os.environ.get('USER', 'unknown')}{Colors.RESET}")
             print()
         else:
-            print("OLLAMA CLI")
+            print("mdllama")
             print(f"Model: {model}")
             print(f"Time: {current_time}")
             print(f"User: {os.environ.get('USER', 'unknown')}")
@@ -987,7 +987,7 @@ def get_version():
 
 def main():
     """Main CLI entrypoint."""
-    parser = argparse.ArgumentParser(description="Ollama CLI - A command-line interface for Ollama API")
+    parser = argparse.ArgumentParser(description="mdllama - A command-line interface for Ollama API")
     parser.add_argument('--version', action='version', version=f'%(prog)s {get_version()}')
 
     # Create subparsers for different commands
