@@ -1231,18 +1231,47 @@ def main():
             if not openai_api_base:
                 cli._print_error("No OpenAI-compatible API base URL provided. Use --openai-api-base or set in config.")
                 return
-            try:
-                resp = requests.get(openai_api_base.rstrip('/') + "/models")
-                if resp.status_code == 200:
-                    data = resp.json()
-                    cli._print_info("Available OpenAI-compatible models:")
-                    for model in data.get('data', []):
-                        model_id = model.get('id', 'Unknown')
-                        print(f"- {model_id}")
-                else:
-                    cli._print_error(f"Error listing models: HTTP {resp.status_code} {resp.text}")
-            except Exception as e:
-                cli._print_error(f"Error listing models: {e}")
+            endpoints_to_try = [cli.config.get('openai_model_list_endpoint', None), '/v1/models', '/models', '/model']
+            endpoints_to_try = [e for e in endpoints_to_try if e]
+            available_models = []
+            for endpoint in endpoints_to_try:
+                try:
+                    url = openai_api_base.rstrip('/') + endpoint
+                    resp = requests.get(url)
+                    if resp.status_code == 200:
+                        # Try JSON first
+                        try:
+                            data = resp.json()
+                            # OpenAI format
+                            if 'data' in data and isinstance(data['data'], list) and data['data']:
+                                available_models = [m.get('id', '') for m in data.get('data', []) if m.get('id')]
+                            # hackclub/ai format: {"models": ["model1", ...]}
+                            elif 'models' in data and isinstance(data['models'], list) and data['models']:
+                                available_models = [m for m in data['models'] if m]
+                            # hackclub/ai format: {"model": "modelname"}
+                            elif 'model' in data and isinstance(data['model'], str) and data['model']:
+                                available_models = [data['model']]
+                        except Exception:
+                            # If not JSON, try plain text (e.g. hackclub/ai /model returns just the model name)
+                            try:
+                                text = resp.text.strip()
+                                if text and '\n' not in text and len(text) < 128:
+                                    available_models = [text]
+                            except Exception:
+                                pass
+                        if available_models:
+                            break
+                except Exception:
+                    pass
+            if available_models:
+                cli._print_info("Available OpenAI-compatible models:")
+                for model in available_models:
+                    if cli.use_colors:
+                        print(f"- {Colors.BRIGHT_YELLOW}{model}{Colors.RESET}")
+                    else:
+                        print(f"- {model}")
+            else:
+                cli._print_error("No models found for the selected OpenAI-compatible provider. Please check your configuration.")
         else:
             cli.list_models()
     elif args.command == "chat":
