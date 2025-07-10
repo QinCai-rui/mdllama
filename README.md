@@ -62,13 +62,14 @@ Note: If the video does not play, you can download it [here](https://raw.githubu
 
    Replace `<version>` with the latest version number.
 
-2. (Optional, recommended) To enable as a repository for updates, create `/etc/yum.repos.d/qincai-mdllama.repo`:
+2. (Optional, highly recommended) To enable as a repository for updates, create `/etc/yum.repos.d/qincai-mdllama.repo`:
 
    ```ini
    [qincai-mdllama]
    name=Raymont's Personal RPMs
    baseurl=https://packages.qincai.xyz/fedora/
    enabled=1
+   metadata_expire=0
    gpgcheck=0
    ```
 
