@@ -309,6 +309,53 @@ class LLM_CLI:
         else:
             self._print_error(f"Unknown provider: {provider}. Use 'ollama' or 'openai'.")
 
+    def _get_openai_models(self, openai_api_base=None):
+        """Get available OpenAI-compatible models."""
+        openai_models = []
+        openai_error = None
+        
+        if not openai_api_base:
+            openai_api_base = os.environ.get('OPENAI_API_BASE') or self.config.get('openai_api_base')
+        
+        if openai_api_base:
+            endpoints_to_try = [self.config.get('openai_model_list_endpoint', None), '/v1/models', '/models', '/model']
+            endpoints_to_try = [e for e in endpoints_to_try if e]
+            for endpoint in endpoints_to_try:
+                try:
+                    resp = requests.get(openai_api_base.rstrip('/') + endpoint)
+                    if resp.status_code == 200:
+                        try:
+                            data = resp.json()
+                            if 'data' in data:
+                                openai_models = [model.get('id', 'Unknown') for model in data['data']]
+                            elif 'models' in data:
+                                openai_models = [model.get('id', 'Unknown') for model in data['models']]
+                            else:
+                                openai_models = list(data.keys()) if isinstance(data, dict) else []
+                        except json.JSONDecodeError:
+                            # Handle plain text response (e.g., from /model endpoint)
+                            model_name = resp.text.strip()
+                            if model_name:
+                                openai_models = [model_name]
+                            else:
+                                openai_models = []
+                        break
+                    elif resp.status_code == 404:
+                        continue
+                    else:
+                        openai_error = f"HTTP {resp.status_code}"
+                        break
+                except Exception as e:
+                    openai_error = str(e)
+                    break
+            else:
+                if not openai_error:
+                    openai_error = "No valid model endpoint found"
+        else:
+            openai_error = "No OpenAI API base configured"
+            
+        return openai_models, openai_error
+
     def list_models(self):
         """List available models from Ollama."""
         # List Ollama models if available
@@ -1273,43 +1320,8 @@ def main():
             ollama_error = "Not configured or not running"
                 
         # --- OpenAI-compatible models ---
-        openai_models = []
-        openai_error = None
         openai_api_base = getattr(args, 'openai_api_base', None) or os.environ.get('OPENAI_API_BASE') or cli.config.get('openai_api_base')
-        if openai_api_base:
-            endpoints_to_try = [cli.config.get('openai_model_list_endpoint', None), '/v1/models', '/models', '/model']
-            endpoints_to_try = [e for e in endpoints_to_try if e]
-            for endpoint in endpoints_to_try:
-                try:
-                    resp = requests.get(openai_api_base.rstrip('/') + endpoint)
-                    if resp.status_code == 200:
-                        try:
-                            data = resp.json()
-                            if 'data' in data:
-                                openai_models = [model.get('id', 'Unknown') for model in data['data']]
-                            elif 'models' in data:
-                                openai_models = [model.get('id', 'Unknown') for model in data['models']]
-                            else:
-                                openai_models = list(data.keys()) if isinstance(data, dict) else []
-                        except json.JSONDecodeError:
-                            # Handle plain text response (e.g., from /model endpoint)
-                            model_name = resp.text.strip()
-                            if model_name:
-                                openai_models = [model_name]
-                            else:
-                                openai_models = []
-                        break
-                    elif resp.status_code == 404:
-                        continue
-                    else:
-                        openai_error = f"HTTP {resp.status_code}"
-                        break
-                except Exception as e:
-                    openai_error = str(e)
-                    break
-            else:
-                if not openai_error:
-                    openai_error = "No valid model endpoint found"
+        openai_models, openai_error = cli._get_openai_models(openai_api_base)
                 
         # --- Output formatting ---
         if ollama_models:
@@ -1419,8 +1431,40 @@ def main():
                     cli._print_error("Ollama not available")
                     return
             else:
-                # For OpenAI, use a default model
-                model = "gpt-3.5-turbo"
+                # For OpenAI, check for available models
+                openai_models, openai_error = cli._get_openai_models(openai_api_base)
+                if openai_models:
+                    if len(openai_models) == 1:
+                        # If only one model available, use it
+                        model = openai_models[0]
+                        cli._print_info(f"Using available model: {model}")
+                    else:
+                        # Show available models and prompt user to select
+                        cli._print_info("Available OpenAI-compatible models:")
+                        for i, model_name in enumerate(openai_models):
+                            print(f"{i+1}. {model_name}")
+                        try:
+                            choice = input("Select a model (number or name): ").strip()
+                            if choice.isdigit():
+                                idx = int(choice) - 1
+                                if 0 <= idx < len(openai_models):
+                                    model = openai_models[idx]
+                                else:
+                                    cli._print_error("Invalid selection")
+                                    return
+                            else:
+                                if choice in openai_models:
+                                    model = choice
+                                else:
+                                    cli._print_error("Model not found in available list")
+                                    return
+                        except (KeyboardInterrupt, EOFError):
+                            print("\nExiting...")
+                            return
+                else:
+                    # No models available, use "Unknown"
+                    model = "Unknown"
+                    cli._print_info(f"No OpenAI models available ({openai_error}). Using 'Unknown' as model name.")
         
         cli.interactive_chat(
             model=model,
