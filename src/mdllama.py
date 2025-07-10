@@ -1283,13 +1283,21 @@ def main():
                 try:
                     resp = requests.get(openai_api_base.rstrip('/') + endpoint)
                     if resp.status_code == 200:
-                        data = resp.json()
-                        if 'data' in data:
-                            openai_models = [model.get('id', 'Unknown') for model in data['data']]
-                        elif 'models' in data:
-                            openai_models = [model.get('id', 'Unknown') for model in data['models']]
-                        else:
-                            openai_models = list(data.keys()) if isinstance(data, dict) else []
+                        try:
+                            data = resp.json()
+                            if 'data' in data:
+                                openai_models = [model.get('id', 'Unknown') for model in data['data']]
+                            elif 'models' in data:
+                                openai_models = [model.get('id', 'Unknown') for model in data['models']]
+                            else:
+                                openai_models = list(data.keys()) if isinstance(data, dict) else []
+                        except json.JSONDecodeError:
+                            # Handle plain text response (e.g., from /model endpoint)
+                            model_name = resp.text.strip()
+                            if model_name:
+                                openai_models = [model_name]
+                            else:
+                                openai_models = []
                         break
                     elif resp.status_code == 404:
                         continue
