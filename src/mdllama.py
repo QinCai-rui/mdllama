@@ -1419,8 +1419,49 @@ def main():
                     cli._print_error("Ollama not available")
                     return
             else:
-                # For OpenAI, use a default model
-                model = "gpt-3.5-turbo"
+                # For OpenAI, try to discover available models
+                openai_api_base = getattr(args, 'openai_api_base', None) or os.environ.get('OPENAI_API_BASE') or cli.config.get('openai_api_base')
+                if openai_api_base:
+                    # Use same discovery logic as models command
+                    endpoints_to_try = [cli.config.get('openai_model_list_endpoint', None), '/v1/models', '/models', '/model']
+                    endpoints_to_try = [e for e in endpoints_to_try if e]
+                    discovered_models = []
+                    
+                    for endpoint in endpoints_to_try:
+                        try:
+                            resp = requests.get(openai_api_base.rstrip('/') + endpoint)
+                            if resp.status_code == 200:
+                                try:
+                                    data = resp.json()
+                                    if 'data' in data:
+                                        discovered_models = [model.get('id', 'Unknown') for model in data['data']]
+                                    elif 'models' in data:
+                                        discovered_models = [model.get('id', 'Unknown') for model in data['models']]
+                                    else:
+                                        discovered_models = list(data.keys()) if isinstance(data, dict) else []
+                                except json.JSONDecodeError:
+                                    # Handle plain text response (e.g., from /model endpoint)
+                                    model_name = resp.text.strip()
+                                    if model_name:
+                                        discovered_models = [model_name]
+                                    else:
+                                        discovered_models = []
+                                break
+                            elif resp.status_code == 404:
+                                continue
+                            else:
+                                break
+                        except Exception:
+                            break
+                    
+                    # Use first discovered model, or fall back to default
+                    if discovered_models:
+                        model = discovered_models[0]
+                    else:
+                        model = "gpt-3.5-turbo"
+                else:
+                    # No OpenAI API base configured, use default
+                    model = "gpt-3.5-turbo"
         
         cli.interactive_chat(
             model=model,
