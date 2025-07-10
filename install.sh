@@ -33,19 +33,21 @@ if [ "$USE_SUDO" = "y" ] || [ "$USE_SUDO" = "yes" ]; then
     echo -e "${YELLOW}Using system install (sudo).${NC}"
     sudo mkdir -p "$MDLLAMA_DIR"
     sudo python3 -m venv "$VENV_DIR"
-    sudo cp "$TMP_CLONE_DIR/mdllama.py" "$MDLLAMA_DIR/mdllama.py"
+    sudo cp "$TMP_CLONE_DIR/src/mdllama.py" "$MDLLAMA_DIR/mdllama.py"
     sudo chmod 755 "$MDLLAMA_DIR/mdllama.py"
+    sudo cp "$TMP_CLONE_DIR/src/requirements.txt" "$MDLLAMA_DIR/requirements.txt"
     sudo "$VENV_DIR/bin/pip" install --upgrade pip
-    sudo "$VENV_DIR/bin/pip" install requests ollama rich
+    sudo "$VENV_DIR/bin/pip" install -r "$MDLLAMA_DIR/requirements.txt"
 else
     MDLLAMA_DIR="$HOME/.local/share/_mdllama"
     VENV_DIR="$MDLLAMA_DIR/venv"
     mkdir -p "$MDLLAMA_DIR"
     python3 -m venv "$VENV_DIR"
-    cp "$TMP_CLONE_DIR/mdllama.py" "$MDLLAMA_DIR/mdllama.py"
+    cp "$TMP_CLONE_DIR/src/mdllama.py" "$MDLLAMA_DIR/mdllama.py"
     chmod 755 "$MDLLAMA_DIR/mdllama.py"
+    cp "$TMP_CLONE_DIR/src/requirements.txt" "$MDLLAMA_DIR/requirements.txt"
     "$VENV_DIR/bin/pip" install --upgrade pip
-    "$VENV_DIR/bin/pip" install requests ollama rich
+    "$VENV_DIR/bin/pip" install -r "$MDLLAMA_DIR/requirements.txt"
 fi
 
 rm -rf "$TMP_CLONE_DIR"
