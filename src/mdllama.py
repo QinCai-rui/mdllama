@@ -563,6 +563,12 @@ class LLM_CLI:
         if file_paths:
             for file_path in file_paths:
                 try:
+                    # Validate file path for security
+                    resolved_path = Path(file_path).resolve()
+                    if str(resolved_path).startswith('/dev/'):
+                        self._print_error(f"Access to system device files is not allowed: {file_path}")
+                        continue
+                    
                     # Check file size (2MB limit)
                     file_size = os.path.getsize(file_path)
                     max_size = 2 * 1024 * 1024  # 2MB in bytes
@@ -1018,6 +1024,12 @@ class LLM_CLI:
                 elif user_input.startswith('file:'):
                     file_path = user_input[5:].strip()
                     try:
+                        # Validate file path for security
+                        resolved_path = Path(file_path).resolve()
+                        if str(resolved_path).startswith('/dev/'):
+                            self._print_error(f"Access to system device files is not allowed: {file_path}")
+                            continue
+                        
                         # Check file size (2MB limit)
                         file_size = os.path.getsize(file_path)
                         max_size = 2 * 1024 * 1024  # 2MB in bytes
@@ -1369,6 +1381,12 @@ def main():
         prompt = args.prompt
         if args.prompt_file:
             try:
+                # Validate file path for security
+                resolved_path = Path(args.prompt_file).resolve()
+                if str(resolved_path).startswith('/dev/'):
+                    cli._print_error(f"Access to system device files is not allowed: {args.prompt_file}")
+                    return
+                
                 with open(args.prompt_file, 'r') as f:
                     prompt = f.read().strip()
             except Exception as e:
