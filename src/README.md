@@ -30,6 +30,7 @@ Go to this [mdllama demo](https://mdllama-demo.qincai.xyz) to try it out live in
 
 > [!NOTE]
 > Try asking the model to give you some markdown-formatted text, like:
+>
 > `Give me a markdown-formatted text about the history of AI.`
 
 So try it out and see how it works!
