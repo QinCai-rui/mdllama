@@ -24,11 +24,15 @@ mdllama makes it easy to interact with Ollama's AI models directly from your com
 ### Help
 ![Help](https://raw.githubusercontent.com/QinCai-rui/mdllama/refs/heads/main/assets/help.png)
 
-## Demo
+## Live Demo
 
-<video controls src="https://raw.githubusercontent.com/QinCai-rui/mdllama/refs/heads/main/assets/demo.webm" title="Demo"></video>
-Note: If the video does not play, you can download it [here](https://raw.githubusercontent.com/QinCai-rui/mdllama/refs/heads/main/assets/demo.webm).
+Go to this [mdllama demo](https://mdllama-demo.qincai.xyz) to try it out live in your browser. The API key is `9c334d5a0863984b641b1375a850fb5d`
 
+> [!NOTE]
+> Try asking the model to give you some markdown-formatted text, like:
+> `Give me a markdown-formatted text about the history of AI.`
+
+So try it out and see how it works!
 
 ## Installation
 
