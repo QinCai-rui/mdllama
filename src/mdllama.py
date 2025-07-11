@@ -559,19 +559,26 @@ class LLM_CLI:
     ) -> Optional[str]:
         """Generate a completion from Ollama API."""
         
-        if not self._ensure_client():
-            return None
-
-        # Prepare any file attachments
+        # Prepare any file attachments first (before client check)
         if file_paths:
             for file_path in file_paths:
                 try:
+                    # Check file size (2MB limit)
+                    file_size = os.path.getsize(file_path)
+                    max_size = 2 * 1024 * 1024  # 2MB in bytes
+                    if file_size > max_size:
+                        self._print_error(f"File '{Path(file_path).name}' is too large ({file_size:,} bytes). Maximum allowed size is 2MB ({max_size:,} bytes).")
+                        continue
+                    
                     with open(file_path, 'r') as f:
                         content = f.read()
                         file_name = Path(file_path).name
                         prompt += f"\n\nContents of {file_name}:\n```\n{content}\n```"
                 except Exception as e:
                     self._print_error(f"Error reading file {file_path}: {e}")
+        
+        if not self._ensure_client():
+            return None
 
         # Prepare messages including context
         messages = self._prepare_messages(prompt, system_prompt)
@@ -963,7 +970,7 @@ class LLM_CLI:
         self._print_info("Interactive chat commands:")
         self._print_command("exit/quit      - End the conversation")
         self._print_command("clear          - Clear the conversation context")
-        self._print_command("file:<path>    - Include a file in your next message")
+        self._print_command("file:<path>    - Include a file in your next message (max 2MB)")
         self._print_command("system:<prompt>- Set or change the system prompt")
         self._print_command("temp:<value>   - Change the temperature setting")
         self._print_command("model:<name>   - Switch to a different model")
@@ -1011,6 +1018,13 @@ class LLM_CLI:
                 elif user_input.startswith('file:'):
                     file_path = user_input[5:].strip()
                     try:
+                        # Check file size (2MB limit)
+                        file_size = os.path.getsize(file_path)
+                        max_size = 2 * 1024 * 1024  # 2MB in bytes
+                        if file_size > max_size:
+                            self._print_error(f"File '{Path(file_path).name}' is too large ({file_size:,} bytes). Maximum allowed size is 2MB ({max_size:,} bytes).")
+                            continue
+                        
                         with open(file_path, 'r') as f:
                             file_content = f.read()
                             file_name = Path(file_path).name
@@ -1175,7 +1189,7 @@ def main():
     chat_parser.add_argument("--system", help="System prompt to use")
     chat_parser.add_argument("--temperature", "-t", type=float, default=0.7, help="Temperature for sampling")
     chat_parser.add_argument("--max-tokens", type=int, help="Maximum number of tokens to generate")
-    chat_parser.add_argument("--file", "-f", action="append", help="Path to file(s) to include as context")
+    chat_parser.add_argument("--file", "-f", action="append", help="Path to file(s) to include as context (max 2MB per file)")
     chat_parser.add_argument("--context", "-c", action="store_true", help="Keep conversation context")
     chat_parser.add_argument("--save", action="store_true", help="Save conversation history")
     chat_parser.add_argument("--no-color", action="store_true", help="Disable colored output")
