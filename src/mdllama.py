@@ -175,6 +175,19 @@ class LLM_CLI:
         """Save current configuration to file."""
         with open(CONFIG_FILE, 'w') as f:
             json.dump(self.config, f, indent=2)
+    
+    def _get_openai_headers(self, api_key: Optional[str] = None) -> Dict[str, str]:
+        """Get headers for OpenAI-compatible API calls, including API key if available."""
+        headers = {"Content-Type": "application/json"}
+        
+        # Get API key from parameter, environment variable, or config
+        if not api_key:
+            api_key = os.environ.get('OPENAI_API_KEY') or self.config.get('openai_api_key')
+        
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        
+        return headers
 
     def _print_error(self, message):
         """Print an error message with color if enabled."""
@@ -280,14 +293,22 @@ class LLM_CLI:
                 openai_api_base = input("Enter your OpenAI-compatible API base URL (e.g. https://ai.hackclub.com): ").strip()
                 if openai_api_base:
                     self.config['openai_api_base'] = openai_api_base
+            
+            # Ask for API key
+            api_key = input("Enter your API key (leave blank if no API key required): ").strip()
+            if api_key:
+                self.config['openai_api_key'] = api_key
+            else:
+                self.config['openai_api_key'] = None
             self._save_config()
             # Test connection: try /v1/models, then /models, then /model (for hackclub/ai)
             test_url = self.config.get('openai_api_base', openai_api_base)
             if test_url:
                 endpoints_to_try = ["/v1/models", "/models", "/model"]
+                headers = self._get_openai_headers()
                 for endpoint in endpoints_to_try:
                     try:
-                        resp = requests.get(test_url.rstrip('/') + endpoint)
+                        resp = requests.get(test_url.rstrip('/') + endpoint, headers=headers)
                         if resp.status_code == 200:
                             self._print_success(f"OpenAI-compatible endpoint connected successfully using '{endpoint}'!")
                             self.config['openai_model_list_endpoint'] = endpoint
@@ -320,9 +341,10 @@ class LLM_CLI:
         if openai_api_base:
             endpoints_to_try = [self.config.get('openai_model_list_endpoint', None), '/v1/models', '/models', '/model']
             endpoints_to_try = [e for e in endpoints_to_try if e]
+            headers = self._get_openai_headers()
             for endpoint in endpoints_to_try:
                 try:
-                    resp = requests.get(openai_api_base.rstrip('/') + endpoint)
+                    resp = requests.get(openai_api_base.rstrip('/') + endpoint, headers=headers)
                     if resp.status_code == 200:
                         try:
                             data = resp.json()
@@ -1115,7 +1137,7 @@ class LLM_CLI:
                     }
                     if max_tokens:
                         payload["max_tokens"] = max_tokens
-                    headers = {"Content-Type": "application/json"}
+                    headers = self._get_openai_headers()
                     try:
                         resp = requests.post(url, json=payload, headers=headers, stream=True)
                         full_response = ""
@@ -1279,7 +1301,7 @@ def main():
         return 'ollama'
 
     def call_openai_chat(messages, model="meta-llama/llama-4-maverick-17b-128e-instruct", stream=False, temperature=0.7, max_tokens=None):
-        url = (openai_api_base or os.environ.get('OPENAI_API_BASE', '')).rstrip('/') + "/chat/completions"
+        url = (openai_api_base or cli.config.get('openai_api_base', '') or os.environ.get('OPENAI_API_BASE', '')).rstrip('/') + "/chat/completions"
         payload = {
             "model": model,
             "messages": messages,
@@ -1288,7 +1310,7 @@ def main():
         }
         if max_tokens:
             payload["max_tokens"] = max_tokens
-        headers = {"Content-Type": "application/json"}
+        headers = cli._get_openai_headers()
         if stream:
             resp = requests.post(url, json=payload, headers=headers, stream=True)
         else:
