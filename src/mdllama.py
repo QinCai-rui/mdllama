@@ -100,8 +100,18 @@ try:
     if not CONFIG_DIR.exists():
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     if os.path.exists(HISTORY_FILE):
-        readline.read_history_file(HISTORY_FILE)
-    atexit.register(lambda: readline.write_history_file(HISTORY_FILE))
+        try:
+            readline.read_history_file(HISTORY_FILE)
+        except (PermissionError, OSError):
+            # Ignore permission errors when reading history file (common on macOS)
+            pass
+    def safe_write_history():
+        try:
+            readline.write_history_file(HISTORY_FILE)
+        except (PermissionError, OSError):
+            # Ignore permission errors when writing history file (common on macOS)
+            pass
+    atexit.register(safe_write_history)
     readline.set_history_length(1000)
 except ImportError:
     READLINE_AVAILABLE = False
