@@ -26,11 +26,20 @@ jobs:
       - name: Install build tools
         run: |
           python -m pip install --upgrade pip
-          pip install build
+          pip install build twine
 
       - name: Build package
         working-directory: src
         run: python -m build
+
+      - name: Validate package
+        working-directory: src
+        run: |
+          python -m twine check dist/*
+          # Test that the package can be imported
+          pip install dist/*.whl
+          python -c "import mdllama; print('Package import successful')"
+          mdllama --version
 
       - name: Publish to PyPI with Trusted Publisher
         uses: pypa/gh-action-pypi-publish@release/v1

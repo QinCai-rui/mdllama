@@ -18,4 +18,4 @@ dependencies = [
 ]
 
 [project.scripts]
-mdllama = "mdllama:main"
+mdllama = "mdllama.main:main"
