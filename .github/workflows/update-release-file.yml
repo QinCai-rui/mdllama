@@ -51,5 +51,5 @@ jobs:
       - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: Update RELEASE and version for new GitHub release [Actions]
+          commit_message: "chore(release): update RELEASE and version for new GitHub release [Actions]"
           file_pattern: RELEASE src/pyproject.toml src/setup.py src/mdllama/version.py
