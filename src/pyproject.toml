@@ -8,7 +8,7 @@ version = "3.0.1"
 description = "A command-line interface for Ollama API"
 authors = [{ name = "QinCai-rui" }]
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "GPL-3.0-only"
 requires-python = ">=3.7"
 dependencies = [
   "requests",
