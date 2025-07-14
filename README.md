@@ -44,7 +44,7 @@ So try it out and see how it works!
 1. Add the PPA to your sources list:
 
    ```bash
-   echo 'deb [trusted=yes] https://packages.qincai.xyz/debian stable main' | sudo tee /etc/apt/sources.list.d/qincai-mdllama.list
+   echo 'deb [trusted=yes] https://packages.qincai.xyz/debian stable main' | sudo tee /etc/apt/sources.list.d/qincai-ppa.list
    sudo apt update
    ```
 
@@ -67,10 +67,10 @@ So try it out and see how it works!
 
    Replace `<version>` with the latest version number.
 
-2. (Optional, highly recommended) To enable as a repository for updates, create `/etc/yum.repos.d/qincai-mdllama.repo`:
+2. (Optional, highly recommended) To enable as a repository for updates, create `/etc/yum.repos.d/qincai-ppa.repo`:
 
    ```ini
-   [qincai-mdllama]
+   [qincai-ppa]
    name=Raymont's Personal RPMs
    baseurl=https://packages.qincai.xyz/fedora/
    enabled=1
