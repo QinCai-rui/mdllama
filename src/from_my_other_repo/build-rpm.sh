@@ -23,8 +23,11 @@ cd mdllama/src
 # Get version from setup.py
 tool_version=$(python3 setup.py --version)
 rm -rf pkgroot
+
+# Install the package with the new modular structure
 python3 setup.py install --root "$PWD/pkgroot"
 
+# Create the RPM package
 fpm -s dir -t rpm \
     -n python3-mdllama \
     -v "$tool_version" \
@@ -32,6 +35,7 @@ fpm -s dir -t rpm \
     --depends python3 \
     --depends python3-requests \
     --depends python3-rich \
+    --depends python3-colorama \
     --depends python3-setuptools \
     --depends python3-pkg-resources \
     --no-auto-depends \
