@@ -21,7 +21,7 @@ import json
 import os
 import readline
 import sys
-from typing import List, Dict, Optional, Union, Any, Literal
+from typing import List, Dict, Optional, Any
 from pathlib import Path
 import datetime
 import re  # For URL detection
