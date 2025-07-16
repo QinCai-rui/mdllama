@@ -1,4 +1,4 @@
-name: Trigger PPA Build on Release
+name: Trigger PPA Build on Beta Release
 
 on:
   workflow_run:
