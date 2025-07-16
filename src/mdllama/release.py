@@ -17,7 +17,7 @@ def check_github_release():
         if resp.status_code != 200:
             print(f"Failed to fetch releases from GitHub (status {resp.status_code})")
             if resp.status_code == 403:
-                print("Your IP may be rate limited. Set a GITHUB_TOKEN environment variable for higher limits.")
+                print("Your IP may be rate limited by GitHub. Set a GITHUB_TOKEN environment variable for higher limits.")
             sys.exit(1)
         releases = resp.json()
         if not releases:
@@ -33,18 +33,61 @@ def check_github_release():
                 latest_prerelease = rel
             if latest_stable and latest_prerelease:
                 break
+        import re
         def ver(rel):
             return rel["tag_name"].lstrip("v") if rel else None
+        def is_date_version(v):
+            return bool(re.match(r"^\d{8}\.\d+$", v))
+        def semver_tuple(v):
+            return tuple(map(int, (v.split(".") + [0,0,0])[:3]))
         def print_release(rel, kind):
             if rel:
-                print(f"Latest {kind}: {rel['tag_name']} - {rel['html_url']}")
+                print(f"Latest {kind} release: {rel['tag_name']} - {rel['html_url']}")
         print(f"Current version: {current}")
         updated = False
-        if latest_stable and ver(latest_stable) != current:
-            print("\033[93mA new stable release is available!\033[0m")
-            print_release(latest_stable, "stable release")
-            updated = True
-        if latest_prerelease and ver(latest_prerelease) != current:
+        stable_ver = ver(latest_stable)
+        pre_ver = ver(latest_prerelease)
+        # Only alert for stable if it's truly newer
+        if latest_stable and stable_ver != current:
+            from datetime import datetime
+            def get_published_at(rel):
+                return rel.get("published_at")
+            if is_date_version(current):
+                if stable_ver and is_date_version(stable_ver):
+                    # Both are date-based, compare as floats
+                    try:
+                        if float(stable_ver) > float(current):
+                            print("\033[93mA new stable release is available!\033[0m")
+                            print_release(latest_stable, "stable")
+                            updated = True
+                    except Exception:
+                        pass
+                else:
+                    # Current is date-based, stable is semver: compare published_at
+                    # Find the current release object
+                    current_rel = None
+                    for rel in releases:
+                        if ver(rel) == current:
+                            current_rel = rel
+                            break
+                    if current_rel and get_published_at(latest_stable) and get_published_at(current_rel):
+                        try:
+                            stable_time = datetime.fromisoformat(get_published_at(latest_stable).replace('Z', '+00:00'))
+                            current_time = datetime.fromisoformat(get_published_at(current_rel).replace('Z', '+00:00'))
+                            if stable_time > current_time:
+                                print("\033[93mA new stable release is available!\033[0m")
+                                print_release(latest_stable, "stable")
+                                updated = True
+                        except Exception:
+                            pass
+            else:
+                # Current is semver, compare tuples
+                if stable_ver and semver_tuple(stable_ver) > semver_tuple(current):
+                    print("\033[93mA new stable release is available!\033[0m")
+                    print_release(latest_stable, "stable")
+                    updated = True
+        # Pre-release alert if not current
+        if latest_prerelease and pre_ver != current:
             print("\033[96mA new pre-release is available!\033[0m")
             print_release(latest_prerelease, "pre-release")
             updated = True
