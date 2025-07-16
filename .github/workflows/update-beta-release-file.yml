@@ -1,12 +1,12 @@
 name: Update Beta/Testing RELEASE on Push
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - testing
     paths:
       - 'src/mdllama/**'
-  workflow_dispatch:
 
 permissions:
   contents: write
