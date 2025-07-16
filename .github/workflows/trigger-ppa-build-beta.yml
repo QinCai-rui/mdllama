@@ -1,4 +1,4 @@
-name: Trigger PPA Build on Release
+name: Trigger PPA Build on Beta Release
 
 on:
   workflow_run:
@@ -23,4 +23,4 @@ jobs:
         run: echo ${{ secrets.PACKAGES_REPO_TOKEN }} | gh auth login --with-token
       - name: Trigger build-and-publish-ppa.yml in packages repo
         run: |
-          gh workflow run build-and-publish-ppa.yml --repo QinCai-rui/packages --field ref=${{ github.ref }} --field release_tag=${{ github.event.release.tag_name }}
+          gh workflow run build-and-publish-ppa-testing.yml --repo QinCai-rui/packages --field ref=${{ github.ref }} --field release_tag=${{ github.event.release.tag_name }}
