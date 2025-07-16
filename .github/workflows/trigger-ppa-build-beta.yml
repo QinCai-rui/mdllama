@@ -1,0 +1,26 @@
+name: Trigger PPA Build on Release
+
+on:
+  workflow_run:
+    workflows: ["Update Beta/Testing RELEASE on Push"]
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  trigger-ppa-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up GitHub CLI
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install GitHub CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gh
+      - name: Authenticate GitHub CLI
+        run: echo ${{ secrets.PACKAGES_REPO_TOKEN }} | gh auth login --with-token
+      - name: Trigger build-and-publish-ppa.yml in packages repo
+        run: |
+          gh workflow run build-and-publish-ppa.yml --repo QinCai-rui/packages --field ref=${{ github.ref }} --field release_tag=${{ github.event.release.tag_name }}

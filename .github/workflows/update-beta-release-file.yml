@@ -1,0 +1,56 @@
+name: Update Beta/Testing RELEASE on Push
+
+on:
+  push:
+    branches:
+      - testing
+    paths:
+      - 'src/mdllama/**'
+
+permissions:
+  contents: write
+
+jobs:
+  update-beta-release-file:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get current UTC date
+        id: date
+        run: echo "DATE=$(date -u +'%Y%m%d')" >> $GITHUB_ENV
+
+      - name: Get current run count for today
+        id: count
+        run: |
+          DATE="$DATE"
+          if [ -f RELEASE ]; then
+            LAST_VERSION=$(cat RELEASE)
+            if [[ $LAST_VERSION == $DATE* ]]; then
+              COUNT=$(echo $LAST_VERSION | cut -d'.' -f2)
+              COUNT=$((COUNT+1))
+            else
+              COUNT=1
+            fi
+          else
+            COUNT=1
+          fi
+          echo "COUNT=$COUNT" >> $GITHUB_ENV
+
+      - name: Set beta version
+        run: |
+          echo "$DATE.$COUNT" > RELEASE
+
+      - name: Update version in pyproject.toml, setup.py, and mdllama/version.py [Beta]
+        run: |
+          sed -i "s/version = \".*\"/version = \"$DATE.$COUNT\"/" src/pyproject.toml
+          sed -i "s/version=\".*\"/version=\"$DATE.$COUNT\"/" src/setup.py
+          sed -i "s/__version__ = \".*\"/__version__ = \"$DATE.$COUNT\"/" src/mdllama/version.py
+
+      - name: Commit and push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(beta): update RELEASE and version for beta/testing push [Actions]"
+          file_pattern: RELEASE src/pyproject.toml src/setup.py src/mdllama/version.py
+          branch: testing
