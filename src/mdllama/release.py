@@ -17,7 +17,7 @@ def check_github_release():
         if resp.status_code != 200:
             print(f"Failed to fetch releases from GitHub (status {resp.status_code})")
             if resp.status_code == 403:
-                print("You may be rate limited. Set a GITHUB_TOKEN environment variable for higher limits.")
+                print("Your IP may be rate limited. Set a GITHUB_TOKEN environment variable for higher limits.")
             sys.exit(1)
         releases = resp.json()
         if not releases:
