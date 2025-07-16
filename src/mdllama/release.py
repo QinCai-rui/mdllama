@@ -5,12 +5,19 @@ from .version import __version__
 
 def check_github_release():
     """Check for new stable and pre-releases on GitHub and alert the user."""
+    import os
     repo = "QinCai-rui/mdllama"
     api_url = f"https://api.github.com/repos/{repo}/releases"
+    headers = {}
+    token = os.environ.get("GITHUB_TOKEN")
+    if token:
+        headers["Authorization"] = f"token {token}"
     try:
-        resp = requests.get(api_url, timeout=10)
+        resp = requests.get(api_url, headers=headers, timeout=10)
         if resp.status_code != 200:
             print(f"Failed to fetch releases from GitHub (status {resp.status_code})")
+            if resp.status_code == 403:
+                print("You may be rate limited. Set a GITHUB_TOKEN environment variable for higher limits.")
             sys.exit(1)
         releases = resp.json()
         if not releases:
