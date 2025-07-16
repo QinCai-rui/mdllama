@@ -53,3 +53,4 @@ def check_github_release():
     except Exception as e:
         print(f"Error checking releases: {e}")
         sys.exit(1)
+
