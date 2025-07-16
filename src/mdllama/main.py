@@ -1,9 +1,12 @@
+import sys
+import json
 """Main entry point for mdllama CLI"""
 
 import argparse
 import os
 import requests
 from .version import __version__
+from .release import check_github_release
 from .cli import LLM_CLI
 
 def get_version():
@@ -21,6 +24,9 @@ def main():
 
     # Create subparsers for different commands
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
+
+    # Check release command (moved here)
+    subparsers.add_parser("check-release", help="Check for new stable and pre-releases of mdllama")
 
     # Setup command
     setup_parser = subparsers.add_parser("setup", help="Set up the CLI with Ollama or OpenAI-compatible configuration")
@@ -98,6 +104,9 @@ def main():
     cli = LLM_CLI(use_colors=use_colors, render_markdown=render_markdown)
 
     # Handle commands
+    if args.command == "check-release":
+        check_github_release()
+        return
     if args.command == "setup":
         provider = getattr(args, 'provider', None) or 'ollama'
         cli.setup(
@@ -202,6 +211,8 @@ def main():
     else:
         # If no command is provided, print help
         parser.print_help()
+
+
 
 if __name__ == "__main__":
     main()

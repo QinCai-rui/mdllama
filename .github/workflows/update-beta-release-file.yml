@@ -54,3 +54,14 @@ jobs:
           commit_message: "chore(beta): update RELEASE and version for beta/testing push [Actions]"
           file_pattern: RELEASE src/pyproject.toml src/setup.py src/mdllama/version.py
           branch: testing
+
+      - name: Create GitHub Pre-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION_TAG="${DATE}.${COUNT}"
+          RELEASE_NAME="Beta Release $DATE.$COUNT"
+          # Create a new pre-release (or update if exists)
+          gh release create "$VERSION_TAG" --prerelease --title "$RELEASE_NAME" --notes "Automated beta pre-release for $DATE.$COUNT." || \
+          gh release edit "$VERSION_TAG" --prerelease --title "$RELEASE_NAME" --notes "Automated beta pre-release for $DATE.$COUNT."
+        shell: bash
