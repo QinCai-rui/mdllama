@@ -59,7 +59,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION_TAG="v${DATE}.${COUNT}-beta"
+          VERSION_TAG="v${DATE}.${COUNT}"
           RELEASE_NAME="Beta Release $DATE.$COUNT"
           # Create a new pre-release (or update if exists)
           gh release create "$VERSION_TAG" --prerelease --title "$RELEASE_NAME" --notes "Automated beta pre-release for $DATE.$COUNT." || \
