@@ -6,6 +6,7 @@ on:
       - testing
     paths:
       - 'src/mdllama/**'
+  workflow_dispatch:
 
 permissions:
   contents: write
