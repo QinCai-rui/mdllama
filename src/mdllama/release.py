@@ -44,6 +44,8 @@ def check_github_release():
             if rel:
                 print(f"Latest {kind} release: {rel['tag_name']} - {rel['html_url']}")
         print(f"Current version: {current}")
+        print(f"Latest stable: {ver(latest_stable) if latest_stable else 'None'}")
+        print(f"Latest prerelease: {ver(latest_prerelease) if latest_prerelease else 'None'}")
         updated = False
         stable_ver = ver(latest_stable)
         pre_ver = ver(latest_prerelease)
@@ -91,13 +93,13 @@ def check_github_release():
             from datetime import datetime
             def get_published_at(rel):
                 return rel.get("published_at")
-            if is_date_version(current) and is_date_version(pre_ver):
-                # Compare publish dates
-                current_rel = None
-                for rel in releases:
-                    if ver(rel) == current:
-                        current_rel = rel
-                        break
+            current_rel = None
+            for rel in releases:
+                if ver(rel) == current:
+                    current_rel = rel
+                    break
+            # If both are date-based, or if current is semver and pre-release is date-based, compare publish dates
+            if (is_date_version(current) and is_date_version(pre_ver)) or (not is_date_version(current) and is_date_version(pre_ver)):
                 if current_rel and get_published_at(latest_prerelease) and get_published_at(current_rel):
                     try:
                         pre_time = datetime.fromisoformat(get_published_at(latest_prerelease).replace('Z', '+00:00'))
@@ -109,7 +111,7 @@ def check_github_release():
                     except Exception:
                         pass
             else:
-                # For semver or mixed, just compare version string as before
+                # For semver or other cases, just compare version string as before
                 if pre_ver != current:
                     print("\033[96mA new pre-release is available!\033[0m")
                     print_release(latest_prerelease, "pre-release")
@@ -119,3 +121,6 @@ def check_github_release():
     except Exception as e:
         print(f"Error checking releases: {e}")
         sys.exit(1)
+
+if __name__ == "__main__":
+    check_github_release()
