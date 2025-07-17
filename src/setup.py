@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="mdllama",
-    version="20250717.3",
+    version="3.2.4",
     description="A command-line interface for Ollama API",
     author="QinCai-rui",
     packages=find_packages(),
