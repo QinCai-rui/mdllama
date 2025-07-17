@@ -6,7 +6,23 @@ mdllama \- A command-line interface for LLMs (Ollama, OpenAI-compatible)
 .B mdllama
 [OPTIONS] COMMAND [ARGS]
 .SH DESCRIPTION
-mdllama is a CLI tool for interacting with large language models (LLMs) via Ollama and OpenAI-compatible endpoints. It supports chat completions, interactive chat, model management, session history, and more.
+mdllama is a CLI tool for interacting with large language models (LLMs) via Ollama and OpenAI-compatible endpoints. It supports chat completions, interactive chat, model management, session history, file attachments, Markdown rendering, and more.
+.PP
+Features:
+.IP \(bu 2
+Chat with Ollama or OpenAI-compatible models from the terminal
+.IP \(bu 2
+Built-in Markdown rendering (with --render-markdown)
+.IP \(bu 2
+File attachments as context (max 2MB per file)
+.IP \(bu 2
+Session history and management
+.IP \(bu 2
+Model management (list, pull, remove, ps)
+.IP \(bu 2
+Colorful output (disable with --no-color or NO_COLOR)
+.IP \(bu 2
+Configurable providers and endpoints
 .SH OPTIONS
 .TP
 .B -h, --help
@@ -107,7 +123,7 @@ GitHub token for higher API rate limits when checking releases.
 Set to disable colored output globally.
 .SH FILES
 .TP
-.B ~/.config/mdllama/config.yaml
+.B ~/.mdllama/config.json
 Default configuration file location.
 .SH EXAMPLES
 .TP
@@ -125,3 +141,45 @@ Pull a model from Ollama.
 .TP
 .B mdllama check-release
 Check for new releases.
+.SH TROUBLESHOOTING
+.PP
+If you encounter issues:
+.IP \(bu 2
+Check your provider and endpoint configuration
+.IP \(bu 2
+Ensure your API key is set for OpenAI-compatible endpoints
+.IP \(bu 2
+Use --no-color or set NO_COLOR if your terminal does not support colours
+.IP \(bu 2
+Check ~/.mdllama/config.json for configuration problems
+.IP \(bu 2
+Use GITHUB_TOKEN for higher GitHub API rate limits when checking for new releases
+.IP \(bu 2
+See https://github.com/QinCai-rui/mdllama for documentation and updates
+.SH EXIT CODES
+.TP
+0
+Success
+.TP
+1
+Error or failed command
+.TP
+130
+Interrupted (Ctrl+C)
+.PP
+.SH SEE ALSO
+.TP
+.B mdllama project page:
+https://github.com/QinCai-rui/mdllama
+.TP
+.B Ollama:
+https://ollama.com
+.TP
+.B OpenAI API:
+https://platform.openai.com/docs/api-reference
+.TP
+.B Rich (Markdown rendering):
+https://github.com/Textualize/rich
+.SH AUTHOR
+.PP
+mdllama is developed by QinCai-rui/Raymont Qin and contributors. See the project page for details and credits.
