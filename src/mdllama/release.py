@@ -42,10 +42,10 @@ def check_github_release():
             return tuple(map(int, (v.split(".") + [0,0,0])[:3]))
         def print_release(rel, kind):
             if rel:
-                print(f"Latest {kind} release: {rel['tag_name']} - {rel['html_url']}")
-        print(f"Current version: {current}")
-        print(f"Latest stable: {ver(latest_stable) if latest_stable else 'None'}")
-        print(f"Latest prerelease: {ver(latest_prerelease) if latest_prerelease else 'None'}")
+                print(f"    \033[1;33mLatest {kind} release:\033[0m \033[1;36m{rel['tag_name']}\033[0m - \033[4;34m{rel['html_url']}\033[0m\n")
+        print(f"\033[1;37mCurrent version:\033[0m \033[1;32m{current}\033[0m\n")
+        print(f"\033[1;36mLatest stable:\033[0m {ver(latest_stable) if latest_stable else 'None'}")
+        print(f"\033[1;35mLatest prerelease:\033[0m {ver(latest_prerelease) if latest_prerelease else 'None'}\n")
         updated = False
         stable_ver = ver(latest_stable)
         pre_ver = ver(latest_prerelease)
@@ -117,7 +117,7 @@ def check_github_release():
                     print_release(latest_prerelease, "pre-release")
                     updated = True
         if not updated:
-            print("You are using the latest version.")
+            print("\n\033[1;32mYou are using the latest version.\033[0m\n")
     except Exception as e:
         print(f"Error checking releases: {e}")
         sys.exit(1)
