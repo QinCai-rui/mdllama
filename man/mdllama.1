@@ -1,0 +1,127 @@
+.
+.TH MDLLAMA 1 "July 2025" "mdllama" "User Commands"
+.SH NAME
+mdllama \- A command-line interface for LLMs (Ollama, OpenAI-compatible)
+.SH SYNOPSIS
+.B mdllama
+[OPTIONS] COMMAND [ARGS]
+.SH DESCRIPTION
+mdllama is a CLI tool for interacting with large language models (LLMs) via Ollama and OpenAI-compatible endpoints. It supports chat completions, interactive chat, model management, session history, and more.
+.SH OPTIONS
+.TP
+.B -h, --help
+Show help message and exit.
+.TP
+.B --version
+Show version information and exit.
+.TP
+.B -p, --provider PROVIDER
+Provider to use: ollama or openai (default: ollama)
+.TP
+.B --openai-api-base URL
+OpenAI-compatible API base URL (e.g. https://ai.hackclub.com)
+.SH COMMANDS
+.TP
+.B check-release
+Check for new stable and pre-releases of mdllama.
+.TP
+.B setup [OPTIONS]
+Set up the CLI with Ollama or OpenAI-compatible configuration.
+.nf
+  -p, --provider PROVIDER   Provider to set up: ollama or openai (default: ollama)
+  --ollama-host URL        Ollama host URL
+  --openai-api-base URL    OpenAI-compatible API base URL
+.fi
+.TP
+.B models [OPTIONS]
+List available models.
+.nf
+  -p, --provider PROVIDER   Provider to use: ollama or openai (default: ollama)
+.fi
+.TP
+.B chat [OPTIONS] [PROMPT]
+Generate a chat completion.
+.nf
+  --model, -m MODEL        Model to use for completion (default: gemma3:1b)
+  --stream, -s             Stream the response
+  --system PROMPT          System prompt to use
+  --temperature, -t FLOAT  Temperature for sampling (default: 0.7)
+  --max-tokens INT         Maximum number of tokens to generate
+  --file, -f FILE          Path to file(s) to include as context (max 2MB per file)
+  --context, -c            Keep conversation context
+  --save                   Save conversation history
+  --no-color               Disable colored output
+  --render-markdown, -r    Render markdown in the response
+  --prompt-file FILE       Path to file containing the prompt
+.fi
+.TP
+.B run [OPTIONS]
+Start an interactive chat session.
+.nf
+  --model, -m MODEL        Model to use for completion
+  --system, -s PROMPT      System prompt to use
+  --temperature, -t FLOAT  Temperature for sampling (default: 0.7)
+  --max-tokens INT         Maximum number of tokens to generate
+  --save                   Save conversation history
+  --no-color               Disable colored output
+  --render-markdown, -r    Render markdown in the response
+.fi
+.TP
+.B clear-context
+Clear the current conversation context.
+.TP
+.B sessions
+List available conversation sessions.
+.TP
+.B load-session SESSION_ID
+Load a conversation session.
+.TP
+.B pull MODEL
+Pull a model from Ollama registry.
+.TP
+.B list
+List all models in Ollama.
+.TP
+.B ps
+Show running model processes in Ollama.
+.TP
+.B rm MODEL
+Remove a model from Ollama.
+.SH INTERACTIVE CHAT COMMANDS
+In interactive mode (run):
+.nf
+  exit/quit         End the conversation
+  clear             Clear the conversation context
+  file:<path>       Include a file in your next message (max 2MB)
+  system:<prompt>   Set or change the system prompt
+  temp:<value>      Change the temperature setting
+  model:<name>      Switch to a different model
+  """              Start/end a multiline message
+.fi
+.SH ENVIRONMENT
+.TP
+.B GITHUB_TOKEN
+GitHub token for higher API rate limits when checking releases.
+.TP
+.B NO_COLOR
+Set to disable colored output globally.
+.SH FILES
+.TP
+.B ~/.config/mdllama/config.yaml
+Default configuration file location.
+.SH EXAMPLES
+.TP
+.B mdllama chat "Hello, world!"
+Generate a chat completion.
+.TP
+.B mdllama run
+Start an interactive chat session.
+.TP
+.B mdllama setup --provider openai --openai-api-base https://api.example.com
+Set up OpenAI-compatible provider.
+.TP
+.B mdllama pull gemma3:1b
+Pull a model from Ollama.
+.TP
+.B mdllama check-release
+Check for new releases.

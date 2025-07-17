@@ -1,6 +1,7 @@
 name: Update Beta/Testing RELEASE on Push
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - testing
