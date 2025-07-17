@@ -86,11 +86,34 @@ def check_github_release():
                     print("\033[93mA new stable release is available!\033[0m")
                     print_release(latest_stable, "stable")
                     updated = True
-        # Pre-release alert if not current
-        if latest_prerelease and pre_ver != current:
-            print("\033[96mA new pre-release is available!\033[0m")
-            print_release(latest_prerelease, "pre-release")
-            updated = True
+        # Pre-release alert: only if pre-release is newer than current
+        if latest_prerelease:
+            from datetime import datetime
+            def get_published_at(rel):
+                return rel.get("published_at")
+            if is_date_version(current) and is_date_version(pre_ver):
+                # Compare publish dates
+                current_rel = None
+                for rel in releases:
+                    if ver(rel) == current:
+                        current_rel = rel
+                        break
+                if current_rel and get_published_at(latest_prerelease) and get_published_at(current_rel):
+                    try:
+                        pre_time = datetime.fromisoformat(get_published_at(latest_prerelease).replace('Z', '+00:00'))
+                        current_time = datetime.fromisoformat(get_published_at(current_rel).replace('Z', '+00:00'))
+                        if pre_time > current_time:
+                            print("\033[96mA new pre-release is available!\033[0m")
+                            print_release(latest_prerelease, "pre-release")
+                            updated = True
+                    except Exception:
+                        pass
+            else:
+                # For semver or mixed, just compare version string as before
+                if pre_ver != current:
+                    print("\033[96mA new pre-release is available!\033[0m")
+                    print_release(latest_prerelease, "pre-release")
+                    updated = True
         if not updated:
             print("You are using the latest version.")
     except Exception as e:
