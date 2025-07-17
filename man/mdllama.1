@@ -214,10 +214,10 @@ GitHub personal access token for higher API rate limits when checking releases.
 When set to any value, disables colored output globally.
 .SH FILES
 .TP
-.B ~/.config/mdllama/config.yaml
+.B ~/.mdllama/config.yaml
 Primary configuration file containing provider settings, API keys, and default options.
 .TP
-.B ~/.config/mdllama/history/
+.B ~/.mdllama/history/
 Directory containing conversation session files.
 .SH EXAMPLES
 .TP
@@ -265,7 +265,7 @@ to download models from Ollama registry.
 .TP
 .B Configuration Issues
 Check
-.B ~/.config/mdllama/config.yaml
+.B ~/.mdllama/config.yaml
 for syntax errors or incorrect settings. Use
 .B mdllama setup
 to reconfigure.
@@ -290,19 +290,6 @@ for real-time response output, especially useful for longer responses.
 Set
 .B GITHUB_TOKEN
 for higher GitHub API rate limits when checking releases frequently.
-.SH EXIT STATUS
-.TP
-.B 0
-Successful completion.
-.TP
-.B 1
-General error (invalid arguments, configuration problems, API errors).
-.TP
-.B 2
-File or network access error.
-.TP
-.B 130
-Interrupted by user (Ctrl+C).
 .SH SEE ALSO
 .TP
 .B mdllama project page:
