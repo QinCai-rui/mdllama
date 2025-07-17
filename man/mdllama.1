@@ -1,127 +1,322 @@
 .
-.TH MDLLAMA 1 "July 2025" "mdllama" "User Commands"
+.TH MDLLAMA 1 "July 2025" "mdllama 3.2.x" "User Commands"
 .SH NAME
-mdllama \- A command-line interface for LLMs (Ollama, OpenAI-compatible)
+mdllama \- command-line interface for large language models via Ollama and OpenAI-compatible endpoints
 .SH SYNOPSIS
 .B mdllama
-[OPTIONS] COMMAND [ARGS]
+.RB [ \-h | \-\-help ]
+.RB [ \-\-version ]
+.RB [ \-p | \-\-provider
+.IR PROVIDER ]
+.RB [ \-\-openai\-api\-base
+.IR URL ]
+.I COMMAND
+.RI [ ARGS... ]
 .SH DESCRIPTION
-mdllama is a CLI tool for interacting with large language models (LLMs) via Ollama and OpenAI-compatible endpoints. It supports chat completions, interactive chat, model management, session history, and more.
+.B mdllama
+is a command-line interface for interacting with large language models (LLMs) through Ollama and OpenAI-compatible API endpoints. It provides both single-shot chat completions and interactive chat sessions, along with comprehensive model management capabilities.
+.PP
+The tool supports streaming responses, file attachments as context, conversation history management, and rich Markdown rendering. It can be configured to work with multiple providers and maintains session history for persistent conversations.
+.PP
+.B Key Features:
+.IP \(bu 2
+Interactive and non-interactive chat modes
+.IP \(bu 2
+Multiple LLM provider support (Ollama, OpenAI-compatible APIs)
+.IP \(bu 2
+File attachment support (up to 2MB per file)
+.IP \(bu 2
+Conversation history and session management
+.IP \(bu 2
+Model management (list, pull, remove, status)
+.IP \(bu 2
+Streaming responses with real-time output
+.IP \(bu 2
+Rich Markdown rendering and syntax highlighting
+.IP \(bu 2
+Customizable system prompts and parameters
+.IP \(bu 2
+Colored terminal output with fallback support
 .SH OPTIONS
 .TP
-.B -h, --help
-Show help message and exit.
+.BR \-h ", " \-\-help
+Display help message and exit.
 .TP
-.B --version
-Show version information and exit.
+.B \-\-version
+Display version information and exit.
 .TP
-.B -p, --provider PROVIDER
-Provider to use: ollama or openai (default: ollama)
+.BR \-p ", " \-\-provider " " \fIPROVIDER\fR
+Specify the provider to use. Valid values are
+.B ollama
+(default) and
+.BR openai .
 .TP
-.B --openai-api-base URL
-OpenAI-compatible API base URL (e.g. https://ai.hackclub.com)
+.BI \-\-openai\-api\-base " " URL
+Set the base URL for OpenAI-compatible API endpoints (e.g., https://ai.hackclub.com).
 .SH COMMANDS
+.SS "Release Management"
 .TP
 .B check-release
-Check for new stable and pre-releases of mdllama.
+Check for new stable and pre-release versions of mdllama from the GitHub repository.
+.SS "Configuration"
 .TP
-.B setup [OPTIONS]
-Set up the CLI with Ollama or OpenAI-compatible configuration.
-.nf
-  -p, --provider PROVIDER   Provider to set up: ollama or openai (default: ollama)
-  --ollama-host URL        Ollama host URL
-  --openai-api-base URL    OpenAI-compatible API base URL
-.fi
+.BI setup " " [ OPTIONS ]
+Configure mdllama with provider settings and API endpoints.
+.RS
 .TP
-.B models [OPTIONS]
-List available models.
-.nf
-  -p, --provider PROVIDER   Provider to use: ollama or openai (default: ollama)
-.fi
+.BR \-p ", " \-\-provider " " \fIPROVIDER\fR
+Provider to configure:
+.B ollama
+(default) or
+.BR openai .
 .TP
-.B chat [OPTIONS] [PROMPT]
-Generate a chat completion.
-.nf
-  --model, -m MODEL        Model to use for completion (default: gemma3:1b)
-  --stream, -s             Stream the response
-  --system PROMPT          System prompt to use
-  --temperature, -t FLOAT  Temperature for sampling (default: 0.7)
-  --max-tokens INT         Maximum number of tokens to generate
-  --file, -f FILE          Path to file(s) to include as context (max 2MB per file)
-  --context, -c            Keep conversation context
-  --save                   Save conversation history
-  --no-color               Disable colored output
-  --render-markdown, -r    Render markdown in the response
-  --prompt-file FILE       Path to file containing the prompt
-.fi
+.BI \-\-ollama\-host " " URL
+Ollama server host URL (default: http://localhost:11434).
 .TP
-.B run [OPTIONS]
-Start an interactive chat session.
-.nf
-  --model, -m MODEL        Model to use for completion
-  --system, -s PROMPT      System prompt to use
-  --temperature, -t FLOAT  Temperature for sampling (default: 0.7)
-  --max-tokens INT         Maximum number of tokens to generate
-  --save                   Save conversation history
-  --no-color               Disable colored output
-  --render-markdown, -r    Render markdown in the response
-.fi
+.BI \-\-openai\-api\-base " " URL
+OpenAI-compatible API base URL.
+.RE
+.SS "Model Management"
 .TP
-.B clear-context
+.BI models " " [ OPTIONS ]
+List available models from the configured provider.
+.RS
+.TP
+.BR \-p ", " \-\-provider " " \fIPROVIDER\fR
+Provider to query:
+.B ollama
+(default) or
+.BR openai .
+.RE
+.TP
+.BI pull " " MODEL
+Download a model from the Ollama registry.
+.TP
+.B list
+List all locally available models in Ollama.
+.TP
+.B ps
+Show currently running model processes in Ollama.
+.TP
+.BI rm " " MODEL
+Remove a model from local Ollama storage.
+.SS "Chat Operations"
+.TP
+.BI chat " " [ OPTIONS ] " " [ PROMPT ]
+Generate a single chat completion. If no prompt is provided as an argument, it must be specified via
+.BR \-\-prompt\-file .
+.RS
+.TP
+.BR \-m ", " \-\-model " " \fIMODEL\fR
+Model to use for completion (default: gemma3:1b).
+.TP
+.BR \-s ", " \-\-stream
+Enable streaming response output.
+.TP
+.BI \-\-system " " PROMPT
+Set system prompt to guide model behavior.
+.TP
+.BR \-t ", " \-\-temperature " " \fIFLOAT\fR
+Set sampling temperature (default: 0.7, range: 0.0-1.0).
+.TP
+.BI \-\-max\-tokens " " INT
+Maximum number of tokens to generate.
+.TP
+.BR \-f ", " \-\-file " " \fIFILE\fR
+Include file contents as context (max 2MB per file). Can be specified multiple times.
+.TP
+.BR \-c ", " \-\-context
+Maintain conversation context across multiple invocations.
+.TP
+.B \-\-save
+Save conversation to session history.
+.TP
+.B \-\-no\-color
+Disable colored output.
+.TP
+.BR \-r ", " \-\-render\-markdown
+Enable rich Markdown rendering (requires python-rich).
+.TP
+.BI \-\-prompt\-file " " FILE
+Read prompt from specified file.
+.RE
+.TP
+.BI run " " [ OPTIONS ]
+Start an interactive chat session with continuous conversation.
+.RS
+.TP
+.BR \-m ", " \-\-model " " \fIMODEL\fR
+Model to use for completion.
+.TP
+.BR \-s ", " \-\-system " " \fIPROMPT\fR
+Set initial system prompt.
+.TP
+.BR \-t ", " \-\-temperature " " \fIFLOAT\fR
+Set sampling temperature (default: 0.7).
+.TP
+.BI \-\-max\-tokens " " INT
+Maximum number of tokens to generate per response.
+.TP
+.B \-\-save
+Save conversation to session history when exiting.
+.TP
+.B \-\-no\-color
+Disable colored output.
+.TP
+.BR \-r ", " \-\-render\-markdown
+Enable rich Markdown rendering.
+.RE
+.SS "Session Management"
+.TP
+.B clear\-context
 Clear the current conversation context.
 .TP
 .B sessions
-List available conversation sessions.
+List all saved conversation sessions with timestamps and message counts.
 .TP
-.B load-session SESSION_ID
-Load a conversation session.
+.BI load\-session " " SESSION_ID
+Load a previously saved conversation session.
+.SH INTERACTIVE COMMANDS
+When in interactive mode (started with
+.BR run ),
+the following special commands are available:
 .TP
-.B pull MODEL
-Pull a model from Ollama registry.
+.BR exit ", " quit
+End the interactive session.
 .TP
-.B list
-List all models in Ollama.
+.B clear
+Clear the current conversation context while remaining in the session.
 .TP
-.B ps
-Show running model processes in Ollama.
+.BI file: path
+Include the contents of
+.I path
+in the next message (maximum 2MB per file).
 .TP
-.B rm MODEL
-Remove a model from Ollama.
-.SH INTERACTIVE CHAT COMMANDS
-In interactive mode (run):
-.nf
-  exit/quit         End the conversation
-  clear             Clear the conversation context
-  file:<path>       Include a file in your next message (max 2MB)
-  system:<prompt>   Set or change the system prompt
-  temp:<value>      Change the temperature setting
-  model:<name>      Switch to a different model
-  """              Start/end a multiline message
-.fi
+.BI system: prompt
+Set or change the system prompt. Use without
+.I prompt
+to clear.
+.TP
+.BI temp: value
+Change the temperature setting for subsequent responses.
+.TP
+.BI model: name
+Switch to a different model.
+.TP
+.B """""""
+Start or end multiline input mode for composing longer messages.
 .SH ENVIRONMENT
 .TP
 .B GITHUB_TOKEN
-GitHub token for higher API rate limits when checking releases.
+GitHub personal access token for higher API rate limits when checking releases.
 .TP
 .B NO_COLOR
-Set to disable colored output globally.
+When set to any value, disables colored output globally.
 .SH FILES
 .TP
-.B ~/.config/mdllama/config.yaml
-Default configuration file location.
+.B ~/.mdllama/config.yaml
+Primary configuration file containing provider settings, API keys, and default options.
+.TP
+.B ~/.mdllama/history/
+Directory containing conversation session files.
 .SH EXAMPLES
 .TP
-.B mdllama chat "Hello, world!"
-Generate a chat completion.
+.B mdllama chat "Explain quantum computing"
+Generate a simple chat completion.
 .TP
-.B mdllama run
-Start an interactive chat session.
+.B mdllama chat --model llama3 --stream --render-markdown "Write a README"
+Stream a response with Markdown rendering using a specific model.
 .TP
-.B mdllama setup --provider openai --openai-api-base https://api.example.com
-Set up OpenAI-compatible provider.
+.B mdllama chat --file document.txt --system "You are a helpful assistant" "Summarize this"
+Include a file as context with a custom system prompt.
 .TP
-.B mdllama pull gemma3:1b
-Pull a model from Ollama.
+.B mdllama run --model gemma3:1b --save
+Start an interactive session that saves conversation history.
 .TP
-.B mdllama check-release
-Check for new releases.
+.B mdllama setup --provider openai --openai-api-base https://api.openai.com
+Configure OpenAI provider with custom endpoint.
+.TP
+.B mdllama sessions
+List all saved conversation sessions.
+.TP
+.B mdllama load-session 20250717_143022_abc123
+Load a specific conversation session.
+.TP
+.B mdllama pull llama3:8b
+Download a model from Ollama registry.
+.TP
+.B mdllama models --provider openai
+List available models from OpenAI provider.
+.SH TROUBLESHOOTING
+.SS "Common Issues"
+.TP
+.B Connection Problems
+Verify that Ollama is running (for Ollama provider) or that your API endpoint is accessible (for OpenAI-compatible providers). Check network connectivity and firewall settings.
+.TP
+.B Authentication Errors
+Ensure your API key is properly configured in the configuration file or environment variables for OpenAI-compatible providers.
+.TP
+.B Model Not Found
+Use
+.B mdllama models
+to list available models, or
+.B mdllama pull MODEL
+to download models from Ollama registry.
+.TP
+.B Configuration Issues
+Check
+.B ~/.mdllama/config.yaml
+for syntax errors or incorrect settings. Use
+.B mdllama setup
+to reconfigure.
+.TP
+.B Display Problems
+If colors are not displaying correctly, use
+.B --no-color
+or set the
+.B NO_COLOR
+environment variable.
+.SS "Performance Tips"
+.TP
+.B Large Files
+When attaching files, ensure they are under 2MB. For larger documents, consider splitting them or using file summarization first.
+.TP
+.B Streaming
+Use
+.B --stream
+for real-time response output, especially useful for longer responses.
+.TP
+.B Rate Limits
+Set
+.B GITHUB_TOKEN
+for higher GitHub API rate limits when checking releases frequently.
+.SH SEE ALSO
+.TP
+.B mdllama project page:
+https://github.com/QinCai-rui/mdllama
+.TP
+.B Ollama documentation:
+https://ollama.com/docs
+.TP
+.B OpenAI API reference:
+https://platform.openai.com/docs/api-reference
+.TP
+.B Rich library (Markdown rendering):
+https://github.com/Textualize/rich
+.SH REPORTING BUGS
+Report bugs and feature requests at:
+.br
+https://github.com/QinCai-rui/mdllama/issues
+.SH AUTHOR
+.B mdllama
+is developed by QinCai-rui (Raymont Qin) and contributors.
+.PP
+This manual page was written for the mdllama project.
+.SH COPYRIGHT
+Copyright \(co 2025 QinCai-rui and contributors.
+.br
+License: GNU General Public License v3.0
+.br
+This is free software: you are free to change and redistribute it.
+.br
+There is NO WARRANTY, to the extent permitted by law.
