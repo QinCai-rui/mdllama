@@ -2,6 +2,8 @@
 
 [![Build and Publish mdllama DEB and RPM](https://github.com/QinCai-rui/packages/actions/workflows/build-and-publish-ppa.yml/badge.svg)](https://github.com/QinCai-rui/packages/actions/workflows/build-and-publish-ppa.yml)
 
+[![Build and Publish mdllama DEB and RPM (testing branch)](https://github.com/QinCai-rui/packages/actions/workflows/build-and-publish-ppa-testing.yml/badge.svg)](https://github.com/QinCai-rui/packages/actions/workflows/build-and-publish-ppa-testing.yml)
+
 [![Publish to PyPI on mdllama.py Update](https://github.com/QinCai-rui/mdllama/actions/workflows/publish-to-pypi.yml/badge.svg)](https://github.com/QinCai-rui/mdllama/actions/workflows/publish-to-pypi.yml)
 
 [![PPA development (GH Pages)](https://github.com/QinCai-rui/packages/actions/workflows/pages/pages-build-deployment/badge.svg?branch=gh-pages)](https://github.com/QinCai-rui/packages/actions/workflows/pages/pages-build-deployment)
