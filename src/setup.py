@@ -9,7 +9,8 @@ setup(
     install_requires=[
         "requests",
         "rich",
-        "colorama"
+        "colorama",
+        "ollama"
     ],
     python_requires=">=3.7",
     entry_points={
