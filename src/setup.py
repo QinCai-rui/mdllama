@@ -2,14 +2,15 @@ from setuptools import setup, find_packages
 
 setup(
     name="mdllama",
-    version="20250717.5",
+    version="20250717.6",
     description="A command-line interface for Ollama API",
     author="QinCai-rui",
     packages=find_packages(),
     install_requires=[
         "requests",
         "rich",
-        "colorama"
+        "colorama",
+        "ollama"
     ],
     python_requires=">=3.7",
     entry_points={
