@@ -173,30 +173,11 @@ def main():
     elif args.command == "ps":
         from .ollama_client import OllamaClient
         from .config import OLLAMA_DEFAULT_HOST
-        from .colors import Colors
         
-        ollama_client = OllamaClient(cli.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
+        ollama_client = OllamaClient(cli.config.get('ollama_host', OLLAMA_DEFAULT_HOST), use_colors=use_colors)
         try:
             models = ollama_client.list_running_models()
-            if models:
-                cli.output.print_info("Running models:")
-                for model in models:
-                    name = model.get('name', 'Unknown')
-                    size = model.get('size', 0)
-                    # Format size
-                    if size > 1024**3:
-                        size_str = f"{size/(1024**3):.1f}GB"
-                    elif size > 1024**2:
-                        size_str = f"{size/(1024**2):.1f}MB"
-                    else:
-                        size_str = f"{size}B"
-                    
-                    if use_colors:
-                        print(f"{Colors.BRIGHT_YELLOW}{name}{Colors.RESET} ({size_str})")
-                    else:
-                        print(f"{name} ({size_str})")
-            else:
-                cli.output.print_info("No running models.")
+            ollama_client.format_running_models(models)
         except Exception as e:
             cli.output.print_error(f"Error listing running models: {e}")
     elif args.command == "rm":

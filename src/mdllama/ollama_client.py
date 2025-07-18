@@ -131,111 +131,111 @@ class OllamaClient:
             url = f"{self.host}/api/delete"
             resp = requests.delete(url, json={"name": model_name})
             if resp.status_code == 200:
-                print(f"Model '{model_name}' removed successfully.")
                 return True
             else:
-                print(f"Error: {resp.status_code} {resp.text}")
                 return False
         except Exception:
             return False
             
     def list_running_models(self) -> List[Dict[str, Any]]:
-        """List running model processes with detailed formatting."""
+        """List running model processes and return the data."""
         try:
             url = f"{self.host}/api/ps"
             resp = requests.get(url)
             if resp.status_code == 200:
                 data = resp.json()
                 models = data.get('models', [])
-                if not models:
-                    print("No models are currently running.")
-                    return []
-                
-                # Import Colors here to avoid circular imports
-                from .colors import Colors
-                
-                # Print header
-                if self.use_colors:
-                    print(f"{Colors.BOLD}NAME{Colors.RESET:<12} {Colors.BOLD}ID{Colors.RESET:<18} {Colors.BOLD}SIZE{Colors.RESET:<9} {Colors.BOLD}PROCESSOR{Colors.RESET:<7} {Colors.BOLD}UNTIL{Colors.RESET}")
-                else:
-                    print("NAME         ID              SIZE      PROCESSOR    UNTIL")
-                
-                # Print each running model
-                for model in models:
-                    name = model.get('name', 'Unknown')
-                    model_id = model.get('digest', '')[:12] if model.get('digest') else 'Unknown'
-                    size = model.get('size', 0)
-                    size_str = f"{size // (1024*1024)} MB" if size > 0 else "Unknown"
-                    
-                    # Format processor info based on size_vram and other details
-                    size_vram = model.get('size_vram', 0)
-                    details = model.get('details', {})
-                    
-                    if size_vram > 0:
-                        # Model is using GPU memory
-                        vram_mb = size_vram // (1024 * 1024)
-                        if vram_mb < 1024:
-                            processor = f"GPU ({vram_mb}MB)"
-                        else:
-                            vram_gb = vram_mb / 1024
-                            processor = f"GPU ({vram_gb:.1f}GB)"
-                    else:
-                        # Model is using CPU - check if we have quantization info
-                        quant_level = details.get('quantization_level', '')
-                        if quant_level:
-                            processor = f"CPU ({quant_level})"
-                        else:
-                            processor = "100% CPU"
-                    
-                    # Format expiry time
-                    expires_at = model.get('expires_at', '')
-                    until = "Unknown"
-                    if expires_at:
-                        try:
-                            # Parse the expiry time and calculate relative time
-                            # Try to parse ISO format timestamp
-                            if expires_at.endswith('Z'):
-                                # Remove Z and treat as UTC
-                                expires_at = expires_at[:-1] + '+00:00'
-                            
-                            # Parse the timestamp
-                            if '+' in expires_at or expires_at.endswith('Z'):
-                                # Has timezone info
-                                expire_time = datetime.datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
-                                now = datetime.datetime.now(datetime.timezone.utc)
-                            else:
-                                # No timezone info, assume local time
-                                expire_time = datetime.datetime.fromisoformat(expires_at)
-                                now = datetime.datetime.now()
-                            
-                            diff = expire_time - now
-                            if diff.total_seconds() > 0:
-                                minutes = int(diff.total_seconds() / 60)
-                                if minutes < 60:
-                                    until = f"{minutes} minutes from now"
-                                else:
-                                    hours = minutes // 60
-                                    remaining_minutes = minutes % 60
-                                    if remaining_minutes > 0:
-                                        until = f"{hours}h {remaining_minutes}m from now"
-                                    else:
-                                        until = f"{hours} hours from now"
-                            else:
-                                until = "Expired"
-                        except Exception as e:
-                            # Fallback if parsing fails
-                            until = "Unknown"
-                    
-                    if self.use_colors:
-                        print(f"{Colors.BRIGHT_YELLOW}{name:<12}{Colors.RESET} {model_id:<16} {size_str:<9} {processor:<12} {until}")
-                    else:
-                        print(f"{name:<12} {model_id:<16} {size_str:<9} {processor:<12} {until}")
-                        
                 return models
             else:
                 raise Exception(f"HTTP {resp.status_code}: {resp.text}")
         except Exception as e:
             raise Exception(f"Error listing running models: {e}")
+            
+    def format_running_models(self, models: List[Dict[str, Any]]) -> None:
+        """Format and print running models with detailed output."""
+        if not models:
+            print("No models are currently running.")
+            return
+        
+        # Import Colors here to avoid circular imports
+        from .colors import Colors
+        
+        # Print header
+        if self.use_colors:
+            print(f"{Colors.BOLD}NAME{Colors.RESET:<12} {Colors.BOLD}ID{Colors.RESET:<18} {Colors.BOLD}SIZE{Colors.RESET:<9} {Colors.BOLD}PROCESSOR{Colors.RESET:<7} {Colors.BOLD}UNTIL{Colors.RESET}")
+        else:
+            print("NAME         ID              SIZE      PROCESSOR    UNTIL")
+        
+        # Print each running model
+        for model in models:
+            name = model.get('name', 'Unknown')
+            model_id = model.get('digest', '')[:12] if model.get('digest') else 'Unknown'
+            size = model.get('size', 0)
+            size_str = f"{size // (1024*1024)} MB" if size > 0 else "Unknown"
+            
+            # Format processor info based on size_vram and other details
+            size_vram = model.get('size_vram', 0)
+            details = model.get('details', {})
+            
+            if size_vram > 0:
+                # Model is using GPU memory
+                vram_mb = size_vram // (1024 * 1024)
+                if vram_mb < 1024:
+                    processor = f"GPU ({vram_mb}MB)"
+                else:
+                    vram_gb = vram_mb / 1024
+                    processor = f"GPU ({vram_gb:.1f}GB)"
+            else:
+                # Model is using CPU - check if we have quantization info
+                quant_level = details.get('quantization_level', '')
+                if quant_level:
+                    processor = f"CPU ({quant_level})"
+                else:
+                    processor = "100% CPU"
+            
+            # Format expiry time
+            expires_at = model.get('expires_at', '')
+            until = "Unknown"
+            if expires_at:
+                try:
+                    # Parse the expiry time and calculate relative time
+                    # Try to parse ISO format timestamp
+                    if expires_at.endswith('Z'):
+                        # Remove Z and treat as UTC
+                        expires_at = expires_at[:-1] + '+00:00'
+                    
+                    # Parse the timestamp
+                    if '+' in expires_at or expires_at.endswith('Z'):
+                        # Has timezone info
+                        expire_time = datetime.datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+                        now = datetime.datetime.now(datetime.timezone.utc)
+                    else:
+                        # No timezone info, assume local time
+                        expire_time = datetime.datetime.fromisoformat(expires_at)
+                        now = datetime.datetime.now()
+                    
+                    diff = expire_time - now
+                    if diff.total_seconds() > 0:
+                        minutes = int(diff.total_seconds() / 60)
+                        if minutes < 60:
+                            until = f"{minutes} minutes from now"
+                        else:
+                            hours = minutes // 60
+                            remaining_minutes = minutes % 60
+                            if remaining_minutes > 0:
+                                until = f"{hours}h {remaining_minutes}m from now"
+                            else:
+                                until = f"{hours} hours from now"
+                    else:
+                        until = "Expired"
+                except Exception as e:
+                    # Fallback if parsing fails
+                    until = "Unknown"
+            
+            if self.use_colors:
+                print(f"{Colors.BRIGHT_YELLOW}{name:<12}{Colors.RESET} {model_id:<16} {size_str:<9} {processor:<12} {until}")
+            else:
+                print(f"{name:<12} {model_id:<16} {size_str:<9} {processor:<12} {until}")
             
     def list_models_formatted(self) -> None:
         """List available models with formatted output."""
@@ -244,7 +244,6 @@ class OllamaClient:
             resp = requests.get(url)
             if resp.status_code == 200:
                 data = resp.json()
-                print("Available models:")
                 
                 # Import Colors here to avoid circular imports
                 from .colors import Colors
@@ -257,9 +256,9 @@ class OllamaClient:
                     else:
                         print(f"- {name} ({size} bytes)")
             else:
-                print(f"Error: {resp.status_code} {resp.text}")
+                raise Exception(f"HTTP {resp.status_code}: {resp.text}")
         except Exception as e:
-            print(f"Error listing models: {e}")
+            raise Exception(f"Error listing models: {e}")
             
     def chat(self, 
              messages: List[Dict[str, Any]], 
