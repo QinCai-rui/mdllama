@@ -66,58 +66,61 @@ class OllamaClient:
             raise Exception(f"Error listing models: {e}")
             
     def pull_model(self, model_name: str, show_progress: bool = True) -> bool:
-        """Pull a model from Ollama registry with progress display."""
+        """Pull a model from Ollama registry with progress display. Handles Ctrl+C gracefully."""
         try:
             url = f"{self.host}/api/pull"
             resp = requests.post(url, json={"name": model_name}, stream=True)
             if resp.status_code != 200:
                 print(f"Error: {resp.status_code} {resp.text}")
                 return False
-                
-            if show_progress and RICH_AVAILABLE:
-                with Progress(
-                    TextColumn("[progress.description]{task.description}"),
-                    BarColumn(),
-                    DownloadColumn(),
-                    TransferSpeedColumn(),
-                    TimeRemainingColumn(),
-                ) as progress:
-                    task = progress.add_task(f"Pulling {model_name}", total=None)
+            try:
+                if show_progress and RICH_AVAILABLE:
+                    with Progress(
+                        TextColumn("[progress.description]{task.description}"),
+                        BarColumn(),
+                        DownloadColumn(),
+                        TransferSpeedColumn(),
+                        TimeRemainingColumn(),
+                    ) as progress:
+                        task = progress.add_task(f"Pulling {model_name}", total=None)
+                        total = None
+                        completed = 0
+                        for line in resp.iter_lines():
+                            if line:
+                                data = json.loads(line)
+                                if 'status' in data and data['status'] == 'success':
+                                    progress.update(task, completed=total or completed)
+                                    break
+                                if 'total' in data:
+                                    total = data['total']
+                                    progress.update(task, total=total)
+                                if 'completed' in data:
+                                    completed = data['completed']
+                                    progress.update(task, completed=completed)
+                                if 'digest' in data:
+                                    progress.update(task, description=f"Pulling {model_name} [{data['digest'][:12]}]")
+                else:
+                    # Simple fallback progress
                     total = None
                     completed = 0
                     for line in resp.iter_lines():
                         if line:
                             data = json.loads(line)
                             if 'status' in data and data['status'] == 'success':
-                                progress.update(task, completed=total or completed)
+                                print(f"\nPull complete: {model_name}")
                                 break
                             if 'total' in data:
                                 total = data['total']
-                                progress.update(task, total=total)
                             if 'completed' in data:
                                 completed = data['completed']
-                                progress.update(task, completed=completed)
-                            if 'digest' in data:
-                                progress.update(task, description=f"Pulling {model_name} [{data['digest'][:12]}]")
-            else:
-                # Simple fallback progress
-                total = None
-                completed = 0
-                for line in resp.iter_lines():
-                    if line:
-                        data = json.loads(line)
-                        if 'status' in data and data['status'] == 'success':
-                            print(f"\nPull complete: {model_name}")
-                            break
-                        if 'total' in data:
-                            total = data['total']
-                        if 'completed' in data:
-                            completed = data['completed']
-                        if total:
-                            percent = (completed / total) * 100 if total else 0
-                            sys.stdout.write(f"\rPulling {model_name}: {percent:.1f}% ({completed}/{total})")
-                            sys.stdout.flush()
-                print()
+                            if total:
+                                percent = (completed / total) * 100 if total else 0
+                                sys.stdout.write(f"\rPulling {model_name}: {percent:.1f}% ({completed}/{total})")
+                                sys.stdout.flush()
+                    print()
+            except KeyboardInterrupt:
+                print(f"\nPull cancelled by user (Ctrl+C)")
+                return False
             return True
         except Exception:
             return False
