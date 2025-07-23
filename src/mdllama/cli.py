@@ -95,8 +95,56 @@ class LLM_CLI:
         else:
             self.output.print_error("Could not connect to OpenAI-compatible endpoint. Please check your settings.")
             
-    def list_models(self):
+    def list_models(self, provider: Optional[str] = None, openai_api_base: Optional[str] = None):
         """List available models."""
+        
+        # If provider is explicitly specified, use only that provider
+        if provider == "openai":
+            # Use OpenAI only
+            api_base = openai_api_base or self.config.get('openai_api_base')
+            if not api_base:
+                self.output.print_error("OpenAI API base URL not configured. Use 'mdllama setup -p openai' to configure.")
+                return
+                
+            openai_client = OpenAIClient(api_base, self.config)
+            try:
+                models, error = openai_client.get_models()
+                if error:
+                    self.output.print_error(f"Error listing OpenAI models: {error}")
+                else:
+                    self.output.print_info("Available OpenAI-compatible models:")
+                    for model in models:
+                        if self.use_colors:
+                            print(f"- {Colors.BRIGHT_YELLOW}{model}{Colors.RESET}")
+                        else:
+                            print(f"- {model}")
+                return
+            except Exception as e:
+                self.output.print_error(f"Error listing OpenAI models: {e}")
+                return
+                
+        elif provider == "ollama":
+            # Use Ollama only
+            ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
+            if not ollama_client.is_available():
+                self.output.print_error("Ollama is not available. Please make sure Ollama is running.")
+                return
+                
+            try:
+                models = ollama_client.list_models()
+                self.output.print_info("Available Ollama models:")
+                for model in models:
+                    model_name = model.get('name', 'Unknown')
+                    if self.use_colors:
+                        print(f"- {Colors.BRIGHT_YELLOW}{model_name}{Colors.RESET}")
+                    else:
+                        print(f"- {model_name}")
+                return
+            except Exception as e:
+                self.output.print_error(f"Error listing Ollama models: {e}")
+                return
+        
+        # Default behavior - try both providers
         # Try Ollama first
         ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
         if ollama_client.is_available():
@@ -224,7 +272,9 @@ class LLM_CLI:
                  max_tokens: Optional[int] = None,
                  file_paths: Optional[List[str]] = None,
                  keep_context: bool = True,
-                 save_history: bool = False) -> Optional[str]:
+                 save_history: bool = False,
+                 provider: Optional[str] = None,
+                 openai_api_base: Optional[str] = None) -> Optional[str]:
         """Generate a completion using the configured provider."""
         
         # Process file attachments
@@ -233,6 +283,31 @@ class LLM_CLI:
         # Prepare messages
         messages = self._prepare_messages(prompt, system_prompt)
         
+        # If provider is explicitly specified, use only that provider
+        if provider == "openai":
+            # Use OpenAI only
+            api_base = openai_api_base or self.config.get('openai_api_base')
+            if not api_base:
+                self.output.print_error("OpenAI API base URL not configured. Use 'mdllama setup -p openai' to configure.")
+                return None
+                
+            openai_client = OpenAIClient(api_base, self.config)
+            return self._complete_with_openai(
+                openai_client, messages, model, stream, temperature, max_tokens, keep_context, save_history
+            )
+            
+        elif provider == "ollama":
+            # Use Ollama only
+            ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
+            if not ollama_client.is_available():
+                self.output.print_error("Ollama is not available. Please make sure Ollama is running.")
+                return None
+                
+            return self._complete_with_ollama(
+                ollama_client, messages, model, stream, temperature, max_tokens, keep_context, save_history
+            )
+        
+        # Default behavior - try both providers
         # Try Ollama first
         ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
         if ollama_client.is_available():
@@ -334,16 +409,24 @@ class LLM_CLI:
             if stream:
                 full_response = ""
                 
-                for chunk in client.chat(messages, model, stream, temperature, max_tokens):
-                    if 'choices' in chunk and len(chunk['choices']) > 0:
-                        choice = chunk['choices'][0]
-                        if 'delta' in choice and 'content' in choice['delta']:
-                            content = choice['delta']['content']
-                            if content:
-                                full_response += content
-                                self.output.stream_response(content, Colors.GREEN)
-                                
-                print()  # Add final newline
+                # For OpenAI, always fall back to non-streaming due to API compatibility issues
+                if True:  # Disable streaming for now
+                    response = client.chat(messages, model, False, temperature, max_tokens)
+                    if 'choices' in response and len(response['choices']) > 0:
+                        full_response = response['choices'][0]['message']['content']
+                        
+                        # Render markdown if enabled
+                        if self.render_markdown and RICH_AVAILABLE and self.console:
+                            self.console.print(Markdown(full_response))
+                        else:
+                            processed_response = self.output.process_links_in_markdown(full_response)
+                            if self.use_colors:
+                                print(f"{Colors.GREEN}{processed_response}{Colors.RESET}")
+                            else:
+                                print(full_response)
+                    else:
+                        self.output.print_error("Invalid response format from OpenAI API.")
+                        return None
             else:
                 response = client.chat(messages, model, stream, temperature, max_tokens)
                 if 'choices' in response and len(response['choices']) > 0:
@@ -510,14 +593,17 @@ class LLM_CLI:
                     print("\nAssistant:")
                     
                 # Generate response
+                # Disable streaming for OpenAI provider as it may have compatibility issues
+                use_streaming = True if provider != "openai" else False
                 self.complete(
                     prompt=user_input,
                     model=model,
-                    stream=True,
+                    stream=use_streaming,
                     temperature=temperature,
                     max_tokens=max_tokens,
                     keep_context=True,
-                    save_history=False
+                    save_history=False,
+                    provider=provider
                 )
                 
         except KeyboardInterrupt:
