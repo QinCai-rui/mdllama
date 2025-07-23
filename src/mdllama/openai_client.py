@@ -114,7 +114,7 @@ class OpenAIClient:
         if last_error:
             raise last_error
         else:
-            raise Exception("No valid chat completion endpoint found")
+            raise Exception(f"No valid chat completion endpoint found. Endpoints tried: {endpoints_to_try}. Last error: {last_error}")
             
     def _stream_response(self, url: str, payload: Dict[str, Any], headers: Dict[str, str]) -> Generator[Dict[str, Any], None, None]:
         """Handle streaming response from OpenAI-compatible API."""
