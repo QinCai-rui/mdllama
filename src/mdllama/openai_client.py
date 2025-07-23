@@ -74,7 +74,14 @@ class OpenAIClient:
              max_tokens: Optional[int] = None) -> Any:
         """Generate a chat completion using OpenAI-compatible API."""
         
-        url = f"{self.api_base}/chat/completions"
+        # Try multiple common chat completion endpoints
+        endpoints_to_try = [
+            self.config.get('openai_chat_endpoint', None),
+            '/v1/chat/completions',
+            '/chat/completions',
+            '/openai/v1/chat/completions'
+        ]
+        endpoints_to_try = [e for e in endpoints_to_try if e]
         
         payload = {
             "model": model,
@@ -88,10 +95,26 @@ class OpenAIClient:
             
         headers = get_openai_headers(self.config)
         
-        if stream:
-            return self._stream_response(url, payload, headers)
+        last_error = None
+        for endpoint in endpoints_to_try:
+            try:
+                url = f"{self.api_base}{endpoint}"
+                
+                if stream:
+                    return self._stream_response(url, payload, headers)
+                else:
+                    return self._non_stream_response(url, payload, headers)
+                    
+            except Exception as e:
+                last_error = e
+                # Try next endpoint if this one fails
+                continue
+        
+        # If all endpoints failed, raise the last error
+        if last_error:
+            raise last_error
         else:
-            return self._non_stream_response(url, payload, headers)
+            raise Exception(f"No valid chat completion endpoint found. Endpoints tried: {endpoints_to_try}. Last error: {last_error}")
             
     def _stream_response(self, url: str, payload: Dict[str, Any], headers: Dict[str, str]) -> Generator[Dict[str, Any], None, None]:
         """Handle streaming response from OpenAI-compatible API."""
