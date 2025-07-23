@@ -288,25 +288,47 @@ class LLM_CLI:
                 print(f"({i}) {Colors.BRIGHT_YELLOW}{model}{Colors.RESET}")
             else:
                 print(f"({i}) {model}")
+        
+        if self.use_colors:
+            print(f"\n{Colors.BRIGHT_BLACK}Tip: Enter 'q', 'quit', 'exit', or 'cancel' to abort model selection{Colors.RESET}")
+        else:
+            print("\nTip: Enter 'q', 'quit', 'exit', or 'cancel' to abort model selection")
                 
-        # Get user choice
-        try:
-            if self.use_colors:
-                choice = input(f"\n{Colors.BRIGHT_CYAN}Enter model number (1-{len(models)}): {Colors.RESET}")
-            else:
-                choice = input(f"\nEnter model number (1-{len(models)}): ")
-                
-            choice_num = int(choice.strip())
-            if 1 <= choice_num <= len(models):
-                selected_model = models[choice_num - 1]
-                self.output.print_success(f"Selected model: {selected_model}")
-                return selected_model
-            else:
-                self.output.print_error(f"Invalid choice. Please enter a number between 1 and {len(models)}")
-                return None
-        except (ValueError, EOFError, KeyboardInterrupt):
-            self.output.print_error("Invalid input or cancelled.")
-            return None
+        # Get user choice with retry logic
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            try:
+                if self.use_colors:
+                    choice = input(f"\n{Colors.BRIGHT_CYAN}Enter model number (1-{len(models)}): {Colors.RESET}")
+                else:
+                    choice = input(f"\nEnter model number (1-{len(models)}): ")
+                    
+                # Allow user to cancel
+                if choice.lower() in ['q', 'quit', 'exit', 'cancel']:
+                    self.output.print_info("Model selection cancelled.")
+                    return None
+                    
+                choice_num = int(choice.strip())
+                if 1 <= choice_num <= len(models):
+                    selected_model = models[choice_num - 1]
+                    self.output.print_success(f"Selected model: {selected_model}")
+                    return selected_model
+                else:
+                    remaining_attempts = max_attempts - attempt - 1
+                    if remaining_attempts > 0:
+                        self.output.print_error(f"Invalid choice. Please enter a number between 1 and {len(models)}. {remaining_attempts} attempts remaining.")
+                    else:
+                        self.output.print_error(f"Invalid choice. Maximum attempts reached.")
+                        return None
+            except (ValueError, EOFError, KeyboardInterrupt):
+                remaining_attempts = max_attempts - attempt - 1
+                if remaining_attempts > 0:
+                    self.output.print_error(f"Invalid input. Please enter a valid number. {remaining_attempts} attempts remaining.")
+                else:
+                    self.output.print_error("Invalid input. Maximum attempts reached.")
+                    return None
+        
+        return None
             
     def _prepare_messages(self, prompt: str, system_prompt: Optional[str] = None) -> List[Dict[str, Any]]:
         """Prepare messages for completion, including context."""
