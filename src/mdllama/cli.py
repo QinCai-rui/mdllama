@@ -221,6 +221,93 @@ class LLM_CLI:
             self.output.print_error(f"Error loading history: {e}")
             return False
             
+    def _show_model_chooser(self, provider: str = "ollama") -> Optional[str]:
+        """Show a numbered list of available models and allow user to choose."""
+        models = []
+        
+        if provider == "openai":
+            # Get OpenAI models
+            api_base = self.config.get('openai_api_base')
+            if not api_base:
+                self.output.print_error("OpenAI API base URL not configured.")
+                return None
+                
+            openai_client = OpenAIClient(api_base, self.config)
+            try:
+                model_list, error = openai_client.get_models()
+                if error:
+                    self.output.print_error(f"Error listing OpenAI models: {error}")
+                    return None
+                models = model_list
+            except Exception as e:
+                self.output.print_error(f"Error listing OpenAI models: {e}")
+                return None
+                
+        elif provider == "ollama":
+            # Get Ollama models
+            ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
+            if not ollama_client.is_available():
+                self.output.print_error("Ollama is not available. Please make sure Ollama is running.")
+                return None
+                
+            try:
+                model_data = ollama_client.list_models()
+                models = [model.get('name', 'Unknown') for model in model_data]
+            except Exception as e:
+                self.output.print_error(f"Error listing Ollama models: {e}")
+                return None
+        else:
+            # Try both providers
+            # Try Ollama first
+            ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
+            if ollama_client.is_available():
+                try:
+                    model_data = ollama_client.list_models()
+                    models = [model.get('name', 'Unknown') for model in model_data]
+                except Exception as e:
+                    pass
+                    
+            # Try OpenAI if no Ollama models found
+            if not models and self.config.get('openai_api_base'):
+                openai_client = OpenAIClient(self.config['openai_api_base'], self.config)
+                try:
+                    model_list, error = openai_client.get_models()
+                    if not error:
+                        models = model_list
+                except Exception as e:
+                    pass
+        
+        if not models:
+            self.output.print_error("No models available.")
+            return None
+            
+        # Display numbered list
+        self.output.print_info("Available models:")
+        for i, model in enumerate(models, 1):
+            if self.use_colors:
+                print(f"({i}) {Colors.BRIGHT_YELLOW}{model}{Colors.RESET}")
+            else:
+                print(f"({i}) {model}")
+                
+        # Get user choice
+        try:
+            if self.use_colors:
+                choice = input(f"\n{Colors.BRIGHT_CYAN}Enter model number (1-{len(models)}): {Colors.RESET}")
+            else:
+                choice = input(f"\nEnter model number (1-{len(models)}): ")
+                
+            choice_num = int(choice.strip())
+            if 1 <= choice_num <= len(models):
+                selected_model = models[choice_num - 1]
+                self.output.print_success(f"Selected model: {selected_model}")
+                return selected_model
+            else:
+                self.output.print_error(f"Invalid choice. Please enter a number between 1 and {len(models)}")
+                return None
+        except (ValueError, EOFError, KeyboardInterrupt):
+            self.output.print_error("Invalid input or cancelled.")
+            return None
+            
     def _prepare_messages(self, prompt: str, system_prompt: Optional[str] = None) -> List[Dict[str, Any]]:
         """Prepare messages for completion, including context."""
         messages = self.current_context.copy()
@@ -498,6 +585,7 @@ class LLM_CLI:
         self.output.print_command("system:<prompt>- Set or change the system prompt")
         self.output.print_command("temp:<value>   - Change the temperature setting")
         self.output.print_command("model:<name>   - Switch to a different model")
+        self.output.print_command("models         - Show available models with numbers")
         self.output.print_command('"""           - Start/end a multiline message')
         print()
         
@@ -513,10 +601,9 @@ class LLM_CLI:
         try:
             while True:
                 try:
-                    if self.use_colors:
-                        user_input = input_with_history(f"{Colors.BOLD}{Colors.BLUE}You:{Colors.RESET} ")
-                    else:
-                        user_input = input_with_history("You: ")
+                    # Show current model in prompt
+                    prompt_text = f"You ({model}): " if not self.use_colors else f"{Colors.BOLD}{Colors.BLUE}You ({Colors.BRIGHT_YELLOW}{model}{Colors.BLUE}):{Colors.RESET} "
+                    user_input = input_with_history(prompt_text)
                 except EOFError:
                     print("\nExiting interactive chat...")
                     break
@@ -529,6 +616,11 @@ class LLM_CLI:
                     self.clear_context()
                     if system_prompt:
                         self.current_context.append({"role": "system", "content": system_prompt})
+                    continue
+                elif user_input.lower() == 'models':
+                    selected_model = self._show_model_chooser(provider)
+                    if selected_model:
+                        model = selected_model
                     continue
                 elif user_input.startswith('file:'):
                     file_path = user_input[5:].strip()

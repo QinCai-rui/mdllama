@@ -152,26 +152,32 @@ def main():
     elif args.command == "run":
         provider = getattr(args, 'provider', None) or 'ollama'
         
-        # If no model specified, choose appropriate default based on provider
+        # If no model specified, let user choose from available models
         model = args.model
         if not model:
-            if provider == "openai":
-                # Get the first available OpenAI model
-                from .openai_client import OpenAIClient
-                openai_api_base = getattr(args, 'openai_api_base', None) or cli.config.get('openai_api_base')
-                if openai_api_base:
-                    openai_client = OpenAIClient(openai_api_base, cli.config)
-                    models, error = openai_client.get_models()
-                    if models and not error:
-                        model = models[0]
+            # Show model chooser at startup
+            selected_model = cli._show_model_chooser(provider)
+            if selected_model:
+                model = selected_model
+            else:
+                # Fall back to defaults if selection fails
+                if provider == "openai":
+                    # Get the first available OpenAI model
+                    from .openai_client import OpenAIClient
+                    openai_api_base = getattr(args, 'openai_api_base', None) or cli.config.get('openai_api_base')
+                    if openai_api_base:
+                        openai_client = OpenAIClient(openai_api_base, cli.config)
+                        models, error = openai_client.get_models()
+                        if models and not error:
+                            model = models[0]
+                        else:
+                            cli.output.print_error(f"Could not get OpenAI models: {error}")
+                            return
                     else:
-                        cli.output.print_error(f"Could not get OpenAI models: {error}")
+                        cli.output.print_error("OpenAI API base URL not configured. Use 'mdllama setup -p openai' to configure.")
                         return
                 else:
-                    cli.output.print_error("OpenAI API base URL not configured. Use 'mdllama setup -p openai' to configure.")
-                    return
-            else:
-                model = "gemma3:1b"  # Default Ollama model
+                    model = "gemma3:1b"  # Default Ollama model
         
         cli.interactive_chat(
             model=model,
