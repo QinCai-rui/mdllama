@@ -1,5 +1,5 @@
 .
-.TH MDLLAMA 1 "July 2025" "mdllama 3.2.x" "User Commands"
+.TH MDLLAMA 1 "July 2025" "mdllama 3.3.x" "User Commands"
 .SH NAME
 mdllama \- command-line interface for large language models via Ollama and OpenAI-compatible endpoints
 .SH SYNOPSIS
@@ -23,6 +23,8 @@ The tool supports streaming responses, file attachments as context, conversation
 Interactive and non-interactive chat modes
 .IP \(bu 2
 Multiple LLM provider support (Ollama, OpenAI-compatible APIs)
+.IP \(bu 2
+Interactive model selection with numbered lists
 .IP \(bu 2
 File attachment support (up to 2MB per file)
 .IP \(bu 2
@@ -146,7 +148,7 @@ Start an interactive chat session with continuous conversation.
 .RS
 .TP
 .BR \-m ", " \-\-model " " \fIMODEL\fR
-Model to use for completion.
+Model to use for completion. If not specified, will display a numbered list of available models for selection.
 .TP
 .BR \-s ", " \-\-system " " \fIPROMPT\fR
 Set initial system prompt.
@@ -159,6 +161,9 @@ Maximum number of tokens to generate per response.
 .TP
 .B \-\-save
 Save conversation to session history when exiting.
+.TP
+.B \-\-stream
+Enable streaming response output for real-time display.
 .TP
 .B \-\-no\-color
 Disable colored output.
@@ -201,7 +206,12 @@ to clear.
 Change the temperature setting for subsequent responses.
 .TP
 .BI model: name
-Switch to a different model.
+Switch to a different model. If
+.I name
+is omitted, displays a numbered list of available models for selection.
+.TP
+.B models
+Show a numbered list of available models from the current provider. Enter the number corresponding to your desired model to switch to it.
 .TP
 .B """""""
 Start or end multiline input mode for composing longer messages.
@@ -233,6 +243,12 @@ Include a file as context with a custom system prompt.
 .B mdllama run --model gemma3:1b --save
 Start an interactive session that saves conversation history.
 .TP
+.B mdllama run --stream --render-markdown --provider openai
+Start an interactive session with streaming enabled and Markdown rendering using OpenAI provider.
+.TP
+.B mdllama run
+Start an interactive session and choose from available models via numbered list.
+.TP
 .B mdllama setup --provider openai --openai-api-base https://api.openai.com
 Configure OpenAI provider with custom endpoint.
 .TP
@@ -261,7 +277,12 @@ Use
 .B mdllama models
 to list available models, or
 .B mdllama pull MODEL
-to download models from Ollama registry.
+to download models from Ollama registry. In interactive mode, use the
+.B models
+command to see a numbered list and select a model.
+.TP
+.B Model Selection
+When starting an interactive session without specifying a model, a numbered list will be displayed. Enter a number between 1 and the total count, or use 'q', 'quit', 'exit', or 'cancel' to abort. You have 3 attempts to make a valid selection.
 .TP
 .B Configuration Issues
 Check
@@ -284,7 +305,7 @@ When attaching files, ensure they are under 2MB. For larger documents, consider 
 .B Streaming
 Use
 .B --stream
-for real-time response output, especially useful for longer responses.
+for real-time response output, especially useful for longer responses. For OpenAI-compatible providers, the system will automatically fall back to non-streaming mode if streaming encounters errors.
 .TP
 .B Rate Limits
 Set
