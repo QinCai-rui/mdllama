@@ -95,7 +95,7 @@ class OpenAIClient:
             
     def _stream_response(self, url: str, payload: Dict[str, Any], headers: Dict[str, str]) -> Generator[Dict[str, Any], None, None]:
         """Handle streaming response from OpenAI-compatible API."""
-        response = requests.post(url, json=payload, headers=headers, stream=True)
+        response = requests.post(url, json=payload, headers=headers, stream=True, timeout=30)
         
         if response.status_code == 200:
             for line in response.iter_lines():
@@ -115,7 +115,7 @@ class OpenAIClient:
             
     def _non_stream_response(self, url: str, payload: Dict[str, Any], headers: Dict[str, str]) -> Dict[str, Any]:
         """Handle non-streaming response from OpenAI-compatible API."""
-        response = requests.post(url, json=payload, headers=headers)
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
         
         if response.status_code == 200:
             return response.json()

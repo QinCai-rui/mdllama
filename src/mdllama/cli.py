@@ -95,8 +95,56 @@ class LLM_CLI:
         else:
             self.output.print_error("Could not connect to OpenAI-compatible endpoint. Please check your settings.")
             
-    def list_models(self):
+    def list_models(self, provider: Optional[str] = None, openai_api_base: Optional[str] = None):
         """List available models."""
+        
+        # If provider is explicitly specified, use only that provider
+        if provider == "openai":
+            # Use OpenAI only
+            api_base = openai_api_base or self.config.get('openai_api_base')
+            if not api_base:
+                self.output.print_error("OpenAI API base URL not configured. Use 'mdllama setup -p openai' to configure.")
+                return
+                
+            openai_client = OpenAIClient(api_base, self.config)
+            try:
+                models, error = openai_client.get_models()
+                if error:
+                    self.output.print_error(f"Error listing OpenAI models: {error}")
+                else:
+                    self.output.print_info("Available OpenAI-compatible models:")
+                    for model in models:
+                        if self.use_colors:
+                            print(f"- {Colors.BRIGHT_YELLOW}{model}{Colors.RESET}")
+                        else:
+                            print(f"- {model}")
+                return
+            except Exception as e:
+                self.output.print_error(f"Error listing OpenAI models: {e}")
+                return
+                
+        elif provider == "ollama":
+            # Use Ollama only
+            ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
+            if not ollama_client.is_available():
+                self.output.print_error("Ollama is not available. Please make sure Ollama is running.")
+                return
+                
+            try:
+                models = ollama_client.list_models()
+                self.output.print_info("Available Ollama models:")
+                for model in models:
+                    model_name = model.get('name', 'Unknown')
+                    if self.use_colors:
+                        print(f"- {Colors.BRIGHT_YELLOW}{model_name}{Colors.RESET}")
+                    else:
+                        print(f"- {model_name}")
+                return
+            except Exception as e:
+                self.output.print_error(f"Error listing Ollama models: {e}")
+                return
+        
+        # Default behavior - try both providers
         # Try Ollama first
         ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
         if ollama_client.is_available():
@@ -173,6 +221,115 @@ class LLM_CLI:
             self.output.print_error(f"Error loading history: {e}")
             return False
             
+    def _show_model_chooser(self, provider: str = "ollama") -> Optional[str]:
+        """Show a numbered list of available models and allow user to choose."""
+        models = []
+        
+        if provider == "openai":
+            # Get OpenAI models
+            api_base = self.config.get('openai_api_base')
+            if not api_base:
+                self.output.print_error("OpenAI API base URL not configured.")
+                return None
+                
+            openai_client = OpenAIClient(api_base, self.config)
+            try:
+                model_list, error = openai_client.get_models()
+                if error:
+                    self.output.print_error(f"Error listing OpenAI models: {error}")
+                    return None
+                models = model_list
+            except Exception as e:
+                self.output.print_error(f"Error listing OpenAI models: {e}")
+                return None
+                
+        elif provider == "ollama":
+            # Get Ollama models
+            ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
+            if not ollama_client.is_available():
+                self.output.print_error("Ollama is not available. Please make sure Ollama is running.")
+                return None
+                
+            try:
+                model_data = ollama_client.list_models()
+                models = [model.get('name', 'Unknown') for model in model_data]
+            except Exception as e:
+                self.output.print_error(f"Error listing Ollama models: {e}")
+                return None
+        else:
+            # Try both providers
+            # Try Ollama first
+            ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
+            if ollama_client.is_available():
+                try:
+                    model_data = ollama_client.list_models()
+                    models = [model.get('name', 'Unknown') for model in model_data]
+                except Exception as e:
+                    pass
+                    
+            # Try OpenAI if no Ollama models found
+            if not models and self.config.get('openai_api_base'):
+                openai_client = OpenAIClient(self.config['openai_api_base'], self.config)
+                try:
+                    model_list, error = openai_client.get_models()
+                    if not error:
+                        models = model_list
+                except Exception as e:
+                    pass
+        
+        if not models:
+            self.output.print_error("No models available.")
+            return None
+            
+        # Display numbered list
+        self.output.print_info("Available models:")
+        for i, model in enumerate(models, 1):
+            if self.use_colors:
+                print(f"({i}) {Colors.BRIGHT_YELLOW}{model}{Colors.RESET}")
+            else:
+                print(f"({i}) {model}")
+        
+        if self.use_colors:
+            print(f"\n{Colors.BRIGHT_BLACK}Tip: Enter 'q', 'quit', 'exit', or 'cancel' to abort model selection{Colors.RESET}")
+        else:
+            print("\nTip: Enter 'q', 'quit', 'exit', or 'cancel' to abort model selection")
+                
+        # Get user choice with retry logic
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            try:
+                if self.use_colors:
+                    choice = input(f"\n{Colors.BRIGHT_CYAN}Enter model number (1-{len(models)}): {Colors.RESET}")
+                else:
+                    choice = input(f"\nEnter model number (1-{len(models)}): ")
+                    
+                # Allow user to cancel
+                if choice.lower() in ['q', 'quit', 'exit', 'cancel']:
+                    self.output.print_info("Model selection cancelled.")
+                    return None
+                    
+                choice_num = int(choice.strip())
+                if 1 <= choice_num <= len(models):
+                    selected_model = models[choice_num - 1]
+                    self.output.print_success(f"Selected model: {selected_model}")
+                    return selected_model
+                else:
+                    remaining_attempts = max_attempts - attempt - 1
+                    if remaining_attempts > 0:
+                        self.output.print_error(f"Invalid choice. Please enter a number between 1 and {len(models)}. {remaining_attempts} attempts remaining.")
+                    else:
+                        self.output.print_error(f"Invalid choice. Maximum attempts reached.")
+                        return None
+            except (ValueError, EOFError, KeyboardInterrupt):
+                remaining_attempts = max_attempts - attempt - 1
+                if remaining_attempts > 0:
+                    self.output.print_error(f"Invalid input. Please enter a valid number. {remaining_attempts} attempts remaining.")
+                else:
+                    self.output.print_error("Invalid input. Maximum attempts reached.")
+                    return None
+        
+        return None
+            
     def _prepare_messages(self, prompt: str, system_prompt: Optional[str] = None) -> List[Dict[str, Any]]:
         """Prepare messages for completion, including context."""
         messages = self.current_context.copy()
@@ -224,7 +381,9 @@ class LLM_CLI:
                  max_tokens: Optional[int] = None,
                  file_paths: Optional[List[str]] = None,
                  keep_context: bool = True,
-                 save_history: bool = False) -> Optional[str]:
+                 save_history: bool = False,
+                 provider: Optional[str] = None,
+                 openai_api_base: Optional[str] = None) -> Optional[str]:
         """Generate a completion using the configured provider."""
         
         # Process file attachments
@@ -233,6 +392,31 @@ class LLM_CLI:
         # Prepare messages
         messages = self._prepare_messages(prompt, system_prompt)
         
+        # If provider is explicitly specified, use only that provider
+        if provider == "openai":
+            # Use OpenAI only
+            api_base = openai_api_base or self.config.get('openai_api_base')
+            if not api_base:
+                self.output.print_error("OpenAI API base URL not configured. Use 'mdllama setup -p openai' to configure.")
+                return None
+                
+            openai_client = OpenAIClient(api_base, self.config)
+            return self._complete_with_openai(
+                openai_client, messages, model, stream, temperature, max_tokens, keep_context, save_history
+            )
+            
+        elif provider == "ollama":
+            # Use Ollama only
+            ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
+            if not ollama_client.is_available():
+                self.output.print_error("Ollama is not available. Please make sure Ollama is running.")
+                return None
+                
+            return self._complete_with_ollama(
+                ollama_client, messages, model, stream, temperature, max_tokens, keep_context, save_history
+            )
+        
+        # Default behavior - try both providers
         # Try Ollama first
         ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
         if ollama_client.is_available():
@@ -334,16 +518,24 @@ class LLM_CLI:
             if stream:
                 full_response = ""
                 
-                for chunk in client.chat(messages, model, stream, temperature, max_tokens):
-                    if 'choices' in chunk and len(chunk['choices']) > 0:
-                        choice = chunk['choices'][0]
-                        if 'delta' in choice and 'content' in choice['delta']:
-                            content = choice['delta']['content']
-                            if content:
-                                full_response += content
-                                self.output.stream_response(content, Colors.GREEN)
-                                
-                print()  # Add final newline
+                # For OpenAI, always fall back to non-streaming due to API compatibility issues
+                if True:  # Disable streaming for now
+                    response = client.chat(messages, model, False, temperature, max_tokens)
+                    if 'choices' in response and len(response['choices']) > 0:
+                        full_response = response['choices'][0]['message']['content']
+                        
+                        # Render markdown if enabled
+                        if self.render_markdown and RICH_AVAILABLE and self.console:
+                            self.console.print(Markdown(full_response))
+                        else:
+                            processed_response = self.output.process_links_in_markdown(full_response)
+                            if self.use_colors:
+                                print(f"{Colors.GREEN}{processed_response}{Colors.RESET}")
+                            else:
+                                print(full_response)
+                    else:
+                        self.output.print_error("Invalid response format from OpenAI API.")
+                        return None
             else:
                 response = client.chat(messages, model, stream, temperature, max_tokens)
                 if 'choices' in response and len(response['choices']) > 0:
@@ -415,6 +607,7 @@ class LLM_CLI:
         self.output.print_command("system:<prompt>- Set or change the system prompt")
         self.output.print_command("temp:<value>   - Change the temperature setting")
         self.output.print_command("model:<name>   - Switch to a different model")
+        self.output.print_command("models         - Show available models with numbers")
         self.output.print_command('"""           - Start/end a multiline message')
         print()
         
@@ -430,10 +623,9 @@ class LLM_CLI:
         try:
             while True:
                 try:
-                    if self.use_colors:
-                        user_input = input_with_history(f"{Colors.BOLD}{Colors.BLUE}You:{Colors.RESET} ")
-                    else:
-                        user_input = input_with_history("You: ")
+                    # Show current model in prompt
+                    prompt_text = f"You ({model}): " if not self.use_colors else f"{Colors.BOLD}{Colors.BLUE}You ({Colors.BRIGHT_YELLOW}{model}{Colors.BLUE}):{Colors.RESET} "
+                    user_input = input_with_history(prompt_text)
                 except EOFError:
                     print("\nExiting interactive chat...")
                     break
@@ -446,6 +638,11 @@ class LLM_CLI:
                     self.clear_context()
                     if system_prompt:
                         self.current_context.append({"role": "system", "content": system_prompt})
+                    continue
+                elif user_input.lower() == 'models':
+                    selected_model = self._show_model_chooser(provider)
+                    if selected_model:
+                        model = selected_model
                     continue
                 elif user_input.startswith('file:'):
                     file_path = user_input[5:].strip()
@@ -510,14 +707,17 @@ class LLM_CLI:
                     print("\nAssistant:")
                     
                 # Generate response
+                # Disable streaming for OpenAI provider as it may have compatibility issues
+                use_streaming = True if provider != "openai" else False
                 self.complete(
                     prompt=user_input,
                     model=model,
-                    stream=True,
+                    stream=use_streaming,
                     temperature=temperature,
                     max_tokens=max_tokens,
                     keep_context=True,
-                    save_history=False
+                    save_history=False,
+                    provider=provider
                 )
                 
         except KeyboardInterrupt:

@@ -4,7 +4,7 @@ import json
 import requests
 import sys
 import datetime
-from typing import List, Dict, Any, Optional, Generator
+from typing import List, Dict, Any, Optional, Generator, Callable
 from .config import OLLAMA_DEFAULT_HOST
 
 try:
@@ -268,7 +268,7 @@ class OllamaClient:
              max_tokens: Optional[int] = None,
              keep_context: bool = False,
              current_context: Optional[List[Dict[str, Any]]] = None,
-             process_links_callback: Optional[callable] = None) -> Optional[str]:
+             process_links_callback: Optional[Callable[[str], str]] = None) -> Any:
         """Generate a chat completion using Ollama with full functionality from original."""
         
         # Use direct API endpoint for better control
@@ -288,14 +288,29 @@ class OllamaClient:
             payload["options"]["num_predict"] = max_tokens
         
         if stream:
-            return self._stream_response_with_formatting(api_endpoint, payload, messages, keep_context, current_context, process_links_callback)
+            return self._stream_response_generator(api_endpoint, payload)
         else:
             return self._non_stream_response_with_formatting(api_endpoint, payload, messages, keep_context, current_context, process_links_callback)
+            
+    def _stream_response_generator(self, api_endpoint: str, payload: Dict[str, Any]) -> Generator[Dict[str, Any], None, None]:
+        """Generate streaming response chunks."""
+        response = requests.post(api_endpoint, json=payload, stream=True)
+        
+        if response.status_code == 200:
+            for line in response.iter_lines():
+                if line:
+                    try:
+                        chunk = json.loads(line)
+                        yield chunk
+                    except json.JSONDecodeError:
+                        continue
+        else:
+            raise Exception(f"Ollama API error: {response.status_code} - {response.text}")
             
     def _stream_response_with_formatting(self, api_endpoint: str, payload: Dict[str, Any], 
                                        messages: List[Dict[str, Any]], keep_context: bool,
                                        current_context: Optional[List[Dict[str, Any]]],
-                                       process_links_callback: Optional[callable]) -> Optional[str]:
+                                       process_links_callback: Optional[Callable[[str], str]]) -> Optional[str]:
         """Handle streaming response with formatting from original implementation."""
         full_response = ""
         response = requests.post(api_endpoint, json=payload, stream=True)
@@ -377,7 +392,7 @@ class OllamaClient:
     def _non_stream_response_with_formatting(self, api_endpoint: str, payload: Dict[str, Any],
                                            messages: List[Dict[str, Any]], keep_context: bool,
                                            current_context: Optional[List[Dict[str, Any]]],
-                                           process_links_callback: Optional[callable]) -> Optional[str]:
+                                           process_links_callback: Optional[Callable[[str], str]]) -> Optional[str]:
         """Handle non-streaming response with formatting from original implementation."""
         response = requests.post(api_endpoint, json=payload)
         

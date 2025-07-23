@@ -115,7 +115,9 @@ def main():
             provider=provider
         )
     elif args.command == "models":
-        cli.list_models()
+        provider = getattr(args, 'provider', None)
+        openai_api_base = getattr(args, 'openai_api_base', None)
+        cli.list_models(provider=provider, openai_api_base=openai_api_base)
     elif args.command == "chat":
         # Handle prompt from file or argument
         prompt = args.prompt
@@ -131,6 +133,9 @@ def main():
             cli.output.print_error("No prompt provided. Use --prompt-file or provide a prompt argument.")
             return
             
+        provider = getattr(args, 'provider', None)
+        openai_api_base = getattr(args, 'openai_api_base', None)
+            
         cli.complete(
             prompt=prompt,
             model=args.model,
@@ -140,11 +145,25 @@ def main():
             max_tokens=args.max_tokens,
             file_paths=args.file,
             keep_context=args.context,
-            save_history=args.save
+            save_history=args.save,
+            provider=provider,
+            openai_api_base=openai_api_base
         )
     elif args.command == "run":
-        model = args.model or "gemma3:1b"
         provider = getattr(args, 'provider', None) or 'ollama'
+        
+        # If no model specified, let user choose from available models
+        model = args.model
+        if not model:
+            # Show model chooser at startup
+            selected_model = cli._show_model_chooser(provider)
+            if selected_model:
+                model = selected_model
+            else:
+                # Exit if no valid model was selected
+                cli.output.print_error("No model selected. Exiting.")
+                return
+        
         cli.interactive_chat(
             model=model,
             system_prompt=args.system,
