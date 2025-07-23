@@ -63,6 +63,7 @@ def main():
     interactive_parser.add_argument("--temperature", "-t", type=float, default=0.7, help="Temperature for sampling")
     interactive_parser.add_argument("--max-tokens", type=int, help="Maximum number of tokens to generate")
     interactive_parser.add_argument("--save", action="store_true", help="Save conversation history")
+    interactive_parser.add_argument("--stream", action="store_true", help="Enable streaming responses")
     interactive_parser.add_argument("--no-color", action="store_true", help="Disable colored output")
     interactive_parser.add_argument("--render-markdown", "-r", action="store_true", help="Render markdown in the response")
     interactive_parser.add_argument("-p", "--provider", choices=["ollama", "openai"], default=None, help="Provider to use: ollama or openai (default: ollama)")
@@ -170,6 +171,7 @@ def main():
             temperature=args.temperature,
             max_tokens=args.max_tokens,
             save_history=args.save,
+            stream=args.stream,
             provider=provider
         )
     elif args.command == "clear-context":

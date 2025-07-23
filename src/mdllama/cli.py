@@ -515,11 +515,34 @@ class LLM_CLI:
                               save_history: bool) -> Optional[str]:
         """Complete using OpenAI-compatible API."""
         try:
+            full_response = ""
+            
             if stream:
-                full_response = ""
-                
-                # For OpenAI, always fall back to non-streaming due to API compatibility issues
-                if True:  # Disable streaming for now
+                # Try streaming first, fallback to non-streaming if it fails
+                try:
+                    buffer = ""
+                    for chunk in client.chat(messages, model, True, temperature, max_tokens):
+                        if 'choices' in chunk and len(chunk['choices']) > 0:
+                            delta = chunk['choices'][0].get('delta', {})
+                            if 'content' in delta and delta['content']:
+                                content = delta['content']
+                                buffer += content
+                                full_response += content
+                                
+                                # Process buffer for smoother streaming output
+                                if len(buffer) > 50 or any(c in buffer for c in [' ', '\n', '.', ',', ')']):
+                                    self.output.stream_response(buffer, Colors.GREEN)
+                                    buffer = ""
+                    
+                    # Process remaining buffer
+                    if buffer:
+                        self.output.stream_response(buffer, Colors.GREEN)
+                    
+                    print()  # Add final newline
+                    
+                except Exception as streaming_error:
+                    # Fallback to non-streaming if streaming fails
+                    self.output.print_error(f"Streaming failed, falling back to non-streaming: {streaming_error}")
                     response = client.chat(messages, model, False, temperature, max_tokens)
                     if 'choices' in response and len(response['choices']) > 0:
                         full_response = response['choices'][0]['message']['content']
@@ -537,7 +560,8 @@ class LLM_CLI:
                         self.output.print_error("Invalid response format from OpenAI API.")
                         return None
             else:
-                response = client.chat(messages, model, stream, temperature, max_tokens)
+                # Non-streaming response
+                response = client.chat(messages, model, False, temperature, max_tokens)
                 if 'choices' in response and len(response['choices']) > 0:
                     full_response = response['choices'][0]['message']['content']
                     
@@ -580,6 +604,7 @@ class LLM_CLI:
                          temperature: float = 0.7,
                          max_tokens: Optional[int] = None,
                          save_history: bool = False,
+                         stream: bool = False,
                          provider: str = "ollama"):
         """Start an interactive chat session."""
         provider = provider.lower()
@@ -707,8 +732,8 @@ class LLM_CLI:
                     print("\nAssistant:")
                     
                 # Generate response
-                # Disable streaming for OpenAI provider as it may have compatibility issues
-                use_streaming = True if provider != "openai" else False
+                # Use streaming if requested, with fallback for OpenAI compatibility issues
+                use_streaming = stream
                 self.complete(
                     prompt=user_input,
                     model=model,
