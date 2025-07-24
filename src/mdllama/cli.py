@@ -2,22 +2,21 @@
 
 import os
 import datetime
-import re
 from typing import List, Dict, Optional, Any
 from pathlib import Path
 
 from .config import load_config, save_config, OLLAMA_DEFAULT_HOST
 from .colors import Colors
 from .output import OutputFormatter
-from .history import HistoryManager
 from .ollama_client import OllamaClient
 from .openai_client import OpenAIClient
 from .input_utils import input_with_history, read_multiline_input
+from .session import SessionManager
+from .model_manager import ModelManager
 
 try:
     from rich.console import Console
     from rich.markdown import Markdown
-    from rich.live import Live
     RICH_AVAILABLE = True
 except ImportError:
     RICH_AVAILABLE = False
@@ -29,9 +28,9 @@ class LLM_CLI:
         self.config = load_config()
         self.use_colors = use_colors
         self.render_markdown = render_markdown
-        self.current_context: List[Dict[str, Any]] = []
         self.output = OutputFormatter(use_colors, render_markdown)
-        self.history = HistoryManager()
+        self.session_manager = SessionManager(self.output, use_colors)
+        self.model_manager = ModelManager(self.output, self.config)
         self.console = Console() if RICH_AVAILABLE else None
         
         # Initialize clients
@@ -97,251 +96,27 @@ class LLM_CLI:
             
     def list_models(self, provider: Optional[str] = None, openai_api_base: Optional[str] = None):
         """List available models."""
-        
-        # If provider is explicitly specified, use only that provider
-        if provider == "openai":
-            # Use OpenAI only
-            api_base = openai_api_base or self.config.get('openai_api_base')
-            if not api_base:
-                self.output.print_error("OpenAI API base URL not configured. Use 'mdllama setup -p openai' to configure.")
-                return
-                
-            openai_client = OpenAIClient(api_base, self.config)
-            try:
-                models, error = openai_client.get_models()
-                if error:
-                    self.output.print_error(f"Error listing OpenAI models: {error}")
-                else:
-                    self.output.print_info("Available OpenAI-compatible models:")
-                    for model in models:
-                        if self.use_colors:
-                            print(f"- {Colors.BRIGHT_YELLOW}{model}{Colors.RESET}")
-                        else:
-                            print(f"- {model}")
-                return
-            except Exception as e:
-                self.output.print_error(f"Error listing OpenAI models: {e}")
-                return
-                
-        elif provider == "ollama":
-            # Use Ollama only
-            ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
-            if not ollama_client.is_available():
-                self.output.print_error("Ollama is not available. Please make sure Ollama is running.")
-                return
-                
-            try:
-                models = ollama_client.list_models()
-                self.output.print_info("Available Ollama models:")
-                for model in models:
-                    model_name = model.get('name', 'Unknown')
-                    if self.use_colors:
-                        print(f"- {Colors.BRIGHT_YELLOW}{model_name}{Colors.RESET}")
-                    else:
-                        print(f"- {model_name}")
-                return
-            except Exception as e:
-                self.output.print_error(f"Error listing Ollama models: {e}")
-                return
-        
-        # Default behavior - try both providers
-        # Try Ollama first
-        ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
-        if ollama_client.is_available():
-            try:
-                models = ollama_client.list_models()
-                self.output.print_info("Available Ollama models:")
-                for model in models:
-                    model_name = model.get('name', 'Unknown')
-                    if self.use_colors:
-                        print(f"- {Colors.BRIGHT_YELLOW}{model_name}{Colors.RESET}")
-                    else:
-                        print(f"- {model_name}")
-                return
-            except Exception as e:
-                self.output.print_error(f"Error listing Ollama models: {e}")
-                
-        # Try OpenAI if configured
-        if self.config.get('openai_api_base'):
-            openai_client = OpenAIClient(self.config['openai_api_base'], self.config)
-            try:
-                models, error = openai_client.get_models()
-                if error:
-                    self.output.print_error(f"Error listing OpenAI models: {error}")
-                else:
-                    self.output.print_info("Available OpenAI-compatible models:")
-                    for model in models:
-                        if self.use_colors:
-                            print(f"- {Colors.BRIGHT_YELLOW}{model}{Colors.RESET}")
-                        else:
-                            print(f"- {model}")
-                return
-            except Exception as e:
-                self.output.print_error(f"Error listing OpenAI models: {e}")
-                
-        self.output.print_error("No configured providers available.")
+        self.model_manager.list_models(provider or "ollama", openai_api_base)
         
     def clear_context(self):
         """Clear the current conversation context."""
-        self.current_context = []
-        self.output.print_success("Context cleared.")
+        self.session_manager.clear_context()
         
     def list_sessions(self):
         """List all saved conversation sessions."""
-        sessions = self.history.list_sessions()
-        
-        if not sessions:
-            self.output.print_info("No session history found.")
-            return
-            
-        self.output.print_info("Available sessions:")
-        for session in sessions:
-            session_id = session['id']
-            if session['corrupted']:
-                if self.use_colors:
-                    print(f"- {Colors.YELLOW}{session_id}{Colors.RESET} {Colors.RED}(corrupted){Colors.RESET}")
-                else:
-                    print(f"- {session_id} (corrupted)")
-            else:
-                date = session['date']
-                message_count = session['message_count']
-                if self.use_colors:
-                    print(f"- {Colors.YELLOW}{session_id}{Colors.RESET}: {Colors.WHITE}{date.strftime('%Y-%m-%d %H:%M:%S')}{Colors.RESET} ({message_count} messages)")
-                else:
-                    print(f"- {session_id}: {date.strftime('%Y-%m-%d %H:%M:%S')} ({message_count} messages)")
+        self.session_manager.list_sessions()
                     
     def load_session(self, session_id: str) -> bool:
         """Load a conversation session."""
-        try:
-            self.current_context = self.history.load_history(session_id)
-            self.history.current_session_id = session_id
-            self.output.print_success(f"Loaded history from session {session_id}")
-            return True
-        except (FileNotFoundError, ValueError) as e:
-            self.output.print_error(f"Error loading history: {e}")
-            return False
+        return self.session_manager.load_session(session_id)
             
-    def _show_model_chooser(self, provider: str = "ollama") -> Optional[str]:
+    def show_model_chooser(self, provider: str = "ollama") -> Optional[str]:
         """Show a numbered list of available models and allow user to choose."""
-        models = []
-        
-        if provider == "openai":
-            # Get OpenAI models
-            api_base = self.config.get('openai_api_base')
-            if not api_base:
-                self.output.print_error("OpenAI API base URL not configured.")
-                return None
-                
-            openai_client = OpenAIClient(api_base, self.config)
-            try:
-                model_list, error = openai_client.get_models()
-                if error:
-                    self.output.print_error(f"Error listing OpenAI models: {error}")
-                    return None
-                models = model_list
-            except Exception as e:
-                self.output.print_error(f"Error listing OpenAI models: {e}")
-                return None
-                
-        elif provider == "ollama":
-            # Get Ollama models
-            ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
-            if not ollama_client.is_available():
-                self.output.print_error("Ollama is not available. Please make sure Ollama is running.")
-                return None
-                
-            try:
-                model_data = ollama_client.list_models()
-                models = [model.get('name', 'Unknown') for model in model_data]
-            except Exception as e:
-                self.output.print_error(f"Error listing Ollama models: {e}")
-                return None
-        else:
-            # Try both providers
-            # Try Ollama first
-            ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
-            if ollama_client.is_available():
-                try:
-                    model_data = ollama_client.list_models()
-                    models = [model.get('name', 'Unknown') for model in model_data]
-                except Exception as e:
-                    pass
-                    
-            # Try OpenAI if no Ollama models found
-            if not models and self.config.get('openai_api_base'):
-                openai_client = OpenAIClient(self.config['openai_api_base'], self.config)
-                try:
-                    model_list, error = openai_client.get_models()
-                    if not error:
-                        models = model_list
-                except Exception as e:
-                    pass
-        
-        if not models:
-            self.output.print_error("No models available.")
-            return None
-            
-        # Display numbered list
-        self.output.print_info("Available models:")
-        for i, model in enumerate(models, 1):
-            if self.use_colors:
-                print(f"({i}) {Colors.BRIGHT_YELLOW}{model}{Colors.RESET}")
-            else:
-                print(f"({i}) {model}")
-        
-        if self.use_colors:
-            print(f"\n{Colors.BRIGHT_BLACK}Tip: Enter 'q', 'quit', 'exit', or 'cancel' to abort model selection{Colors.RESET}")
-        else:
-            print("\nTip: Enter 'q', 'quit', 'exit', or 'cancel' to abort model selection")
-                
-        # Get user choice with retry logic
-        max_attempts = 3
-        for attempt in range(max_attempts):
-            try:
-                if self.use_colors:
-                    choice = input(f"\n{Colors.BRIGHT_CYAN}Enter model number (1-{len(models)}): {Colors.RESET}")
-                else:
-                    choice = input(f"\nEnter model number (1-{len(models)}): ")
-                    
-                # Allow user to cancel
-                if choice.lower() in ['q', 'quit', 'exit', 'cancel']:
-                    self.output.print_info("Model selection cancelled.")
-                    return None
-                    
-                choice_num = int(choice.strip())
-                if 1 <= choice_num <= len(models):
-                    selected_model = models[choice_num - 1]
-                    self.output.print_success(f"Selected model: {selected_model}")
-                    return selected_model
-                else:
-                    remaining_attempts = max_attempts - attempt - 1
-                    if remaining_attempts > 0:
-                        self.output.print_error(f"Invalid choice. Please enter a number between 1 and {len(models)}. {remaining_attempts} attempts remaining.")
-                    else:
-                        self.output.print_error(f"Invalid choice. Maximum attempts reached.")
-                        return None
-            except (ValueError, EOFError, KeyboardInterrupt):
-                remaining_attempts = max_attempts - attempt - 1
-                if remaining_attempts > 0:
-                    self.output.print_error(f"Invalid input. Please enter a valid number. {remaining_attempts} attempts remaining.")
-                else:
-                    self.output.print_error("Invalid input. Maximum attempts reached.")
-                    return None
-        
-        return None
+        return self.model_manager.show_model_chooser(provider)
             
     def _prepare_messages(self, prompt: str, system_prompt: Optional[str] = None) -> List[Dict[str, Any]]:
         """Prepare messages for completion, including context."""
-        messages = self.current_context.copy()
-
-        # Add system prompt if provided and not already present
-        if system_prompt and not any(m.get("role") == "system" for m in messages):
-            messages.append({"role": "system", "content": system_prompt})
-            
-        # Add the text prompt
-        messages.append({"role": "user", "content": prompt})
-            
-        return messages
+        return self.session_manager.prepare_messages(prompt, system_prompt)
         
     def _process_file_attachments(self, prompt: str, file_paths: Optional[List[str]]) -> str:
         """Process file attachments and add to prompt."""
@@ -363,7 +138,7 @@ class LLM_CLI:
                     self.output.print_error(f"File '{Path(file_path).name}' is too large ({file_size:,} bytes). Maximum allowed size is 2MB ({max_size:,} bytes).")
                     continue
                 
-                with open(file_path, 'r') as f:
+                with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
                     file_name = Path(file_path).name
                     prompt += f"\n\nContents of {file_name}:\n```\n{content}\n```"
@@ -491,12 +266,10 @@ class LLM_CLI:
             # Update context
             if keep_context:
                 user_message = messages[-1]
-                self.current_context.append(user_message)
-                self.current_context.append({"role": "assistant", "content": full_response})
+                self.session_manager.update_context(user_message, full_response)
                 
             # Save history if requested
-            if save_history:
-                self.history.save_history(self.current_context)
+            self.session_manager.save_history_if_requested(save_history)
                 
             return full_response
             
@@ -585,12 +358,10 @@ class LLM_CLI:
             # Update context
             if keep_context:
                 user_message = messages[-1]
-                self.current_context.append(user_message)
-                self.current_context.append({"role": "assistant", "content": full_response})
+                self.session_manager.update_context(user_message, full_response)
                 
             # Save history if requested
-            if save_history:
-                self.history.save_history(self.current_context)
+            self.session_manager.save_history_if_requested(save_history)
                 
             return full_response
             
@@ -638,7 +409,7 @@ class LLM_CLI:
         
         # Add system prompt if provided
         if system_prompt:
-            self.current_context.append({"role": "system", "content": system_prompt})
+            self.session_manager.current_context.append({"role": "system", "content": system_prompt})
             if self.use_colors:
                 print(f"{Colors.MAGENTA}System:{Colors.RESET} {system_prompt}")
             else:
@@ -662,10 +433,10 @@ class LLM_CLI:
                 elif user_input.lower() == 'clear':
                     self.clear_context()
                     if system_prompt:
-                        self.current_context.append({"role": "system", "content": system_prompt})
+                        self.session_manager.current_context.append({"role": "system", "content": system_prompt})
                     continue
                 elif user_input.lower() == 'models':
-                    selected_model = self._show_model_chooser(provider)
+                    selected_model = self.show_model_chooser(provider)
                     if selected_model:
                         model = selected_model
                     continue
@@ -684,7 +455,7 @@ class LLM_CLI:
                             self.output.print_error(f"File '{Path(file_path).name}' is too large ({file_size:,} bytes). Maximum allowed size is 2MB ({max_size:,} bytes).")
                             continue
                         
-                        with open(file_path, 'r') as f:
+                        with open(file_path, 'r', encoding='utf-8') as f:
                             file_content = f.read()
                             file_name = Path(file_path).name
                             self.output.print_success(f"File '{file_name}' loaded. Include it in your next message.")
@@ -697,9 +468,9 @@ class LLM_CLI:
                         continue
                 elif user_input.startswith('system:'):
                     new_system_prompt = user_input[7:].strip()
-                    self.current_context = [msg for msg in self.current_context if msg.get("role") != "system"]
+                    self.session_manager.current_context = [msg for msg in self.session_manager.current_context if msg.get("role") != "system"]
                     if new_system_prompt:
-                        self.current_context.insert(0, {"role": "system", "content": new_system_prompt})
+                        self.session_manager.current_context.insert(0, {"role": "system", "content": new_system_prompt})
                         self.output.print_success(f"System prompt set to: {new_system_prompt}")
                     else:
                         self.output.print_success("System prompt cleared")
@@ -748,6 +519,7 @@ class LLM_CLI:
         except KeyboardInterrupt:
             print("\nInterrupted. Exiting interactive chat...")
             
-        if save_history and self.current_context:
-            self.history.save_history(self.current_context)
-            self.output.print_success(f"Conversation saved to session {self.history.current_session_id}")
+        if save_history and self.session_manager.current_context:
+            session_id = self.session_manager.save_history_if_requested(True)
+            if session_id:
+                self.output.print_success(f"Conversation saved to session {session_id}")
