@@ -1,10 +1,11 @@
-import sys
-import json
-"""Main entry point for mdllama CLI"""
+"""Main entry point for mdllama CLI
+
+This module handles command-line argument parsing and dispatches to the appropriate
+CLI methods. All business logic is handled by the LLM_CLI class and its managers.
+"""
 
 import argparse
 import os
-import requests
 from .version import __version__
 from .release import check_github_release
 from .cli import LLM_CLI
@@ -14,7 +15,7 @@ def get_version():
     return __version__
 
 def main():
-    """Main CLI entrypoint."""
+    """Main CLI entrypoint - handles argument parsing and dispatch to CLI methods."""
     parser = argparse.ArgumentParser(description="mdllama - A command-line interface for Ollama API and OpenAI-compatible endpoints")
     parser.add_argument('--version', action='version', version=f'%(prog)s {get_version()}')
 
@@ -81,8 +82,8 @@ def main():
     pull_parser = subparsers.add_parser("pull", help="Pull a model from Ollama registry")
     pull_parser.add_argument("model", help="Model name to pull")
 
-    list_parser = subparsers.add_parser("list", help="List all models in Ollama")
-    ps_parser = subparsers.add_parser("ps", help="Show running model processes in Ollama")
+    subparsers.add_parser("list", help="List all models in Ollama")
+    subparsers.add_parser("ps", help="Show running model processes in Ollama")
     rm_parser = subparsers.add_parser("rm", help="Remove a model from Ollama")
     rm_parser.add_argument("model", help="Model name to remove")
 
@@ -124,7 +125,7 @@ def main():
         prompt = args.prompt
         if args.prompt_file:
             try:
-                with open(args.prompt_file, 'r') as f:
+                with open(args.prompt_file, 'r', encoding='utf-8') as f:
                     prompt = f.read().strip()
             except Exception as e:
                 cli.output.print_error(f"Error reading prompt file: {e}")
@@ -157,7 +158,7 @@ def main():
         model = args.model
         if not model:
             # Show model chooser at startup
-            selected_model = cli._show_model_chooser(provider)
+            selected_model = cli.show_model_chooser(provider)
             if selected_model:
                 model = selected_model
             else:
