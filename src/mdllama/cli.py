@@ -412,8 +412,9 @@ class LLM_CLI:
         self.output.print_command("models         - Show available models with numbers")
         self.output.print_command('"""           - Start/end a multiline message')
         self.output.print_info("Keyboard shortcuts:")
-        self.output.print_command("Ctrl+C         - Interrupt current response (continue chat)")
+        self.output.print_command("Ctrl+C         - Interrupt model response (not for exiting)")
         self.output.print_command("Ctrl+D         - Exit the chat session")
+        self.output.print_command("exit/quit      - Exit the chat session")
         print()
         
         # Add system prompt if provided
@@ -433,6 +434,10 @@ class LLM_CLI:
             except EOFError:
                 print("\nExiting interactive chat...")
                 break
+            except KeyboardInterrupt:
+                # CTRL-C during input - don't exit, just show a message
+                print("\nUse 'exit', 'quit', or Ctrl+D to exit the chat.")
+                continue
                 
             # Handle special commands
             if user_input.lower() in ['exit', 'quit']:
