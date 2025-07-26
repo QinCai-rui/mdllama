@@ -403,7 +403,7 @@ class LLM_CLI:
             
         # Print help
         self.output.print_info("Interactive chat commands:")
-        self.output.print_command("exit/quit      - End the conversation")
+        self.output.print_command("exit/quit      - Exit the chat session")
         self.output.print_command("clear          - Clear the conversation context")
         self.output.print_command("file:<path>    - Include a file in your next message (max 2MB)")
         self.output.print_command("system:<prompt>- Set or change the system prompt")
@@ -414,7 +414,6 @@ class LLM_CLI:
         self.output.print_info("Keyboard shortcuts:")
         self.output.print_command("Ctrl+C         - Interrupt model response (not for exiting)")
         self.output.print_command("Ctrl+D         - Exit the chat session")
-        self.output.print_command("exit/quit      - Exit the chat session")
         print()
         
         # Add system prompt if provided
