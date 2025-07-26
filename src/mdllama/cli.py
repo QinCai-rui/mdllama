@@ -273,6 +273,9 @@ class LLM_CLI:
                 
             return full_response
             
+        except KeyboardInterrupt:
+            # Re-raise KeyboardInterrupt to be caught by interactive_chat
+            raise
         except Exception as e:
             self.output.print_error(f"Error during Ollama completion: {e}")
             return None
@@ -365,6 +368,9 @@ class LLM_CLI:
                 
             return full_response
             
+        except KeyboardInterrupt:
+            # Re-raise KeyboardInterrupt to be caught by interactive_chat
+            raise
         except Exception as e:
             self.output.print_error(f"Error during OpenAI completion: {e}")
             return None
@@ -397,7 +403,7 @@ class LLM_CLI:
             
         # Print help
         self.output.print_info("Interactive chat commands:")
-        self.output.print_command("exit/quit      - End the conversation")
+        self.output.print_command("exit/quit      - Exit the chat session")
         self.output.print_command("clear          - Clear the conversation context")
         self.output.print_command("file:<path>    - Include a file in your next message (max 2MB)")
         self.output.print_command("system:<prompt>- Set or change the system prompt")
@@ -405,6 +411,9 @@ class LLM_CLI:
         self.output.print_command("model:<name>   - Switch to a different model")
         self.output.print_command("models         - Show available models with numbers")
         self.output.print_command('"""           - Start/end a multiline message')
+        self.output.print_info("Keyboard shortcuts:")
+        self.output.print_command("Ctrl+C         - Interrupt model response (not for exiting)")
+        self.output.print_command("Ctrl+D         - Exit the chat session")
         print()
         
         # Add system prompt if provided
@@ -416,95 +425,99 @@ class LLM_CLI:
                 print(f"System: {system_prompt}")
             print()
             
-        try:
-            while True:
+        while True:
+            try:
+                # Show current model in prompt
+                prompt_text = f"You ({model}): " if not self.use_colors else f"{Colors.BOLD}{Colors.BLUE}You ({Colors.BRIGHT_YELLOW}{model}{Colors.BLUE}):{Colors.RESET} "
+                user_input = input_with_history(prompt_text)
+            except EOFError:
+                print("\nExiting interactive chat...")
+                break
+            except KeyboardInterrupt:
+                # CTRL-C during input - don't exit, just show a message
+                print("\nUse 'exit', 'quit', or Ctrl+D to exit the chat.")
+                continue
+                
+            # Handle special commands
+            if user_input.lower() in ['exit', 'quit']:
+                print("Exiting interactive chat...")
+                break
+            elif user_input.lower() == 'clear':
+                self.clear_context()
+                if system_prompt:
+                    self.session_manager.current_context.append({"role": "system", "content": system_prompt})
+                continue
+            elif user_input.lower() == 'models':
+                selected_model = self.show_model_chooser(provider)
+                if selected_model:
+                    model = selected_model
+                continue
+            elif user_input.startswith('file:'):
+                file_path = user_input[5:].strip()
                 try:
-                    # Show current model in prompt
-                    prompt_text = f"You ({model}): " if not self.use_colors else f"{Colors.BOLD}{Colors.BLUE}You ({Colors.BRIGHT_YELLOW}{model}{Colors.BLUE}):{Colors.RESET} "
-                    user_input = input_with_history(prompt_text)
-                except EOFError:
-                    print("\nExiting interactive chat...")
-                    break
-                    
-                # Handle special commands
-                if user_input.lower() in ['exit', 'quit']:
-                    print("Exiting interactive chat...")
-                    break
-                elif user_input.lower() == 'clear':
-                    self.clear_context()
-                    if system_prompt:
-                        self.session_manager.current_context.append({"role": "system", "content": system_prompt})
-                    continue
-                elif user_input.lower() == 'models':
-                    selected_model = self.show_model_chooser(provider)
-                    if selected_model:
-                        model = selected_model
-                    continue
-                elif user_input.startswith('file:'):
-                    file_path = user_input[5:].strip()
-                    try:
-                        # Validate and read file
-                        resolved_path = Path(file_path).resolve()
-                        if str(resolved_path).startswith('/dev/'):
-                            self.output.print_error(f"Access to system device files is not allowed: {file_path}")
-                            continue
-                        
-                        file_size = os.path.getsize(file_path)
-                        max_size = 2 * 1024 * 1024  # 2MB
-                        if file_size > max_size:
-                            self.output.print_error(f"File '{Path(file_path).name}' is too large ({file_size:,} bytes). Maximum allowed size is 2MB ({max_size:,} bytes).")
-                            continue
-                        
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            file_content = f.read()
-                            file_name = Path(file_path).name
-                            self.output.print_success(f"File '{file_name}' loaded. Include it in your next message.")
-                            if self.use_colors:
-                                print(f"{Colors.BRIGHT_BLACK}Preview: {file_content[:200]}{'...' if len(file_content) > 200 else ''}{Colors.RESET}")
-                            else:
-                                print(f"Preview: {file_content[:200]}{'...' if len(file_content) > 200 else ''}")
-                    except Exception as e:
-                        self.output.print_error(f"Error reading file: {e}")
+                    # Validate and read file
+                    resolved_path = Path(file_path).resolve()
+                    if str(resolved_path).startswith('/dev/'):
+                        self.output.print_error(f"Access to system device files is not allowed: {file_path}")
                         continue
-                elif user_input.startswith('system:'):
-                    new_system_prompt = user_input[7:].strip()
-                    self.session_manager.current_context = [msg for msg in self.session_manager.current_context if msg.get("role") != "system"]
-                    if new_system_prompt:
-                        self.session_manager.current_context.insert(0, {"role": "system", "content": new_system_prompt})
-                        self.output.print_success(f"System prompt set to: {new_system_prompt}")
-                    else:
-                        self.output.print_success("System prompt cleared")
-                    continue
-                elif user_input.startswith('temp:'):
-                    try:
-                        temperature = float(user_input[5:].strip())
-                        self.output.print_success(f"Temperature set to {temperature}")
-                    except ValueError:
-                        self.output.print_error("Invalid temperature value. Please use a number between 0 and 1.")
-                    continue
-                elif user_input.startswith('model:'):
-                    new_model = user_input[6:].strip()
-                    if new_model:
-                        model = new_model
-                        self.output.print_success(f"Switched to model: {model}")
-                    else:
-                        self.output.print_error("Please specify a model name.")
-                    continue
-                elif user_input.strip() == '"""':
-                    user_input = read_multiline_input()
-                    self.output.print_success("Multiline input received")
                     
-                if not user_input.strip():
-                    continue
+                    file_size = os.path.getsize(file_path)
+                    max_size = 2 * 1024 * 1024  # 2MB
+                    if file_size > max_size:
+                        self.output.print_error(f"File '{Path(file_path).name}' is too large ({file_size:,} bytes). Maximum allowed size is 2MB ({max_size:,} bytes).")
+                        continue
                     
-                if self.use_colors:
-                    print(f"\n{Colors.BOLD}{Colors.GREEN}Assistant:{Colors.RESET}")
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        file_content = f.read()
+                        file_name = Path(file_path).name
+                        self.output.print_success(f"File '{file_name}' loaded. Include it in your next message.")
+                        if self.use_colors:
+                            print(f"{Colors.BRIGHT_BLACK}Preview: {file_content[:200]}{'...' if len(file_content) > 200 else ''}{Colors.RESET}")
+                        else:
+                            print(f"Preview: {file_content[:200]}{'...' if len(file_content) > 200 else ''}")
+                except Exception as e:
+                    self.output.print_error(f"Error reading file: {e}")
+                    continue
+            elif user_input.startswith('system:'):
+                new_system_prompt = user_input[7:].strip()
+                self.session_manager.current_context = [msg for msg in self.session_manager.current_context if msg.get("role") != "system"]
+                if new_system_prompt:
+                    self.session_manager.current_context.insert(0, {"role": "system", "content": new_system_prompt})
+                    self.output.print_success(f"System prompt set to: {new_system_prompt}")
                 else:
-                    print("\nAssistant:")
-                    
-                # Generate response
-                # Use streaming if requested, with fallback for OpenAI compatibility issues
-                use_streaming = stream
+                    self.output.print_success("System prompt cleared")
+                continue
+            elif user_input.startswith('temp:'):
+                try:
+                    temperature = float(user_input[5:].strip())
+                    self.output.print_success(f"Temperature set to {temperature}")
+                except ValueError:
+                    self.output.print_error("Invalid temperature value. Please use a number between 0 and 1.")
+                continue
+            elif user_input.startswith('model:'):
+                new_model = user_input[6:].strip()
+                if new_model:
+                    model = new_model
+                    self.output.print_success(f"Switched to model: {model}")
+                else:
+                    self.output.print_error("Please specify a model name.")
+                continue
+            elif user_input.strip() == '"""':
+                user_input = read_multiline_input()
+                self.output.print_success("Multiline input received")
+                
+            if not user_input.strip():
+                continue
+                
+            if self.use_colors:
+                print(f"\n{Colors.BOLD}{Colors.GREEN}Assistant:{Colors.RESET}")
+            else:
+                print("\nAssistant:")
+                
+            # Generate response
+            # Use streaming if requested, with fallback for OpenAI compatibility issues
+            use_streaming = stream
+            try:
                 self.complete(
                     prompt=user_input,
                     model=model,
@@ -515,10 +528,11 @@ class LLM_CLI:
                     save_history=False,
                     provider=provider
                 )
+            except KeyboardInterrupt:
+                # CTRL-C interrupts the current response but continues the chat
+                print("\n\nResponse interrupted. Continuing chat...")
+                print()
                 
-        except KeyboardInterrupt:
-            print("\nInterrupted. Exiting interactive chat...")
-            
         if save_history and self.session_manager.current_context:
             session_id = self.session_manager.save_history_if_requested(True)
             if session_id:
