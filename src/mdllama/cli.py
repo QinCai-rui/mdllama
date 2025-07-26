@@ -17,6 +17,7 @@ from .model_manager import ModelManager
 try:
     from rich.console import Console
     from rich.markdown import Markdown
+    from rich.live import Live
     RICH_AVAILABLE = True
 except ImportError:
     RICH_AVAILABLE = False
@@ -222,31 +223,44 @@ class LLM_CLI:
         try:
             if stream:
                 full_response = ""
-                buffer = ""
                 
-                for chunk in client.chat(messages, model, stream, temperature, max_tokens):
-                    if 'message' in chunk and 'content' in chunk['message']:
-                        content = chunk['message']['content']
-                        if content:
-                            buffer += content
-                            full_response += content
-                            
-                            # Process buffer for link formatting
-                            if len(buffer) > 100 or any(c in buffer for c in [' ', '\n', '.', ',', ')']):
-                                self.output.stream_response(buffer, Colors.GREEN)
-                                buffer = ""
-                                
-                # Process remaining buffer
-                if buffer:
-                    self.output.stream_response(buffer, Colors.GREEN)
-                    
-                print()  # Add final newline
-                
-                # Render markdown after streaming if enabled
                 if self.render_markdown and RICH_AVAILABLE and self.console:
-                    self.console.print(Markdown(full_response))
-                elif self.render_markdown and not (RICH_AVAILABLE and self.console):
-                    self.output.render_markdown(full_response)
+                    # Use Rich Live for real-time markdown rendering
+                    with Live(Markdown(""), console=self.console, refresh_per_second=10) as live_display:
+                        for chunk in client.chat(messages, model, stream, temperature, max_tokens):
+                            if 'message' in chunk and 'content' in chunk['message']:
+                                content = chunk['message']['content']
+                                if content:
+                                    full_response += content
+                                    try:
+                                        live_display.update(Markdown(full_response))
+                                    except Exception:
+                                        # Fallback to plain text if markdown parsing fails
+                                        live_display.update(full_response)
+                else:
+                    # Fallback to traditional streaming
+                    buffer = ""
+                    for chunk in client.chat(messages, model, stream, temperature, max_tokens):
+                        if 'message' in chunk and 'content' in chunk['message']:
+                            content = chunk['message']['content']
+                            if content:
+                                buffer += content
+                                full_response += content
+                                
+                                # Process buffer for link formatting
+                                if len(buffer) > 100 or any(c in buffer for c in [' ', '\n', '.', ',', ')']):
+                                    self.output.stream_response(buffer, Colors.GREEN)
+                                    buffer = ""
+                                    
+                    # Process remaining buffer
+                    if buffer:
+                        self.output.stream_response(buffer, Colors.GREEN)
+                        
+                    print()  # Add final newline
+                    
+                    # Render markdown after streaming if enabled but Rich not available
+                    if self.render_markdown:
+                        self.output.render_markdown(full_response)
             else:
                 response = client.chat(messages, model, stream, temperature, max_tokens)
                 if 'message' in response and 'content' in response['message']:
@@ -302,31 +316,47 @@ class LLM_CLI:
             if stream:
                 # Try streaming first, fallback to non-streaming if it fails
                 try:
-                    buffer = ""
-                    for chunk in client.chat(messages, model, True, temperature, max_tokens):
-                        if 'choices' in chunk and len(chunk['choices']) > 0:
-                            delta = chunk['choices'][0].get('delta', {})
-                            if 'content' in delta and delta['content']:
-                                content = delta['content']
-                                buffer += content
-                                full_response += content
-                                
-                                # Process buffer for smoother streaming output
-                                if len(buffer) > 50 or any(c in buffer for c in [' ', '\n', '.', ',', ')']):
-                                    self.output.stream_response(buffer, Colors.GREEN)
-                                    buffer = ""
+                    full_response = ""
                     
-                    # Process remaining buffer
-                    if buffer:
-                        self.output.stream_response(buffer, Colors.GREEN)
-                    
-                    print()  # Add final newline
-                    
-                    # Render markdown after streaming if enabled
                     if self.render_markdown and RICH_AVAILABLE and self.console:
-                        self.console.print(Markdown(full_response))
-                    elif self.render_markdown and not (RICH_AVAILABLE and self.console):
-                        self.output.render_markdown(full_response)
+                        # Use Rich Live for real-time markdown rendering
+                        with Live(Markdown(""), console=self.console, refresh_per_second=10) as live_display:
+                            for chunk in client.chat(messages, model, True, temperature, max_tokens):
+                                if 'choices' in chunk and len(chunk['choices']) > 0:
+                                    delta = chunk['choices'][0].get('delta', {})
+                                    if 'content' in delta and delta['content']:
+                                        content = delta['content']
+                                        full_response += content
+                                        try:
+                                            live_display.update(Markdown(full_response))
+                                        except Exception:
+                                            # Fallback to plain text if markdown parsing fails
+                                            live_display.update(full_response)
+                    else:
+                        # Fallback to traditional streaming
+                        buffer = ""
+                        for chunk in client.chat(messages, model, True, temperature, max_tokens):
+                            if 'choices' in chunk and len(chunk['choices']) > 0:
+                                delta = chunk['choices'][0].get('delta', {})
+                                if 'content' in delta and delta['content']:
+                                    content = delta['content']
+                                    buffer += content
+                                    full_response += content
+                                    
+                                    # Process buffer for smoother streaming output
+                                    if len(buffer) > 50 or any(c in buffer for c in [' ', '\n', '.', ',', ')']):
+                                        self.output.stream_response(buffer, Colors.GREEN)
+                                        buffer = ""
+                        
+                        # Process remaining buffer
+                        if buffer:
+                            self.output.stream_response(buffer, Colors.GREEN)
+                        
+                        print()  # Add final newline
+                        
+                        # Render markdown after streaming if enabled but Rich not available
+                        if self.render_markdown:
+                            self.output.render_markdown(full_response)
                     
                 except Exception as streaming_error:
                     # Fallback to non-streaming if streaming fails
