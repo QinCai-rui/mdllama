@@ -241,6 +241,12 @@ class LLM_CLI:
                     self.output.stream_response(buffer, Colors.GREEN)
                     
                 print()  # Add final newline
+                
+                # Render markdown after streaming if enabled
+                if self.render_markdown and RICH_AVAILABLE and self.console:
+                    self.console.print(Markdown(full_response))
+                elif self.render_markdown and not (RICH_AVAILABLE and self.console):
+                    self.output.render_markdown(full_response)
             else:
                 response = client.chat(messages, model, stream, temperature, max_tokens)
                 if 'message' in response and 'content' in response['message']:
@@ -315,6 +321,12 @@ class LLM_CLI:
                         self.output.stream_response(buffer, Colors.GREEN)
                     
                     print()  # Add final newline
+                    
+                    # Render markdown after streaming if enabled
+                    if self.render_markdown and RICH_AVAILABLE and self.console:
+                        self.console.print(Markdown(full_response))
+                    elif self.render_markdown and not (RICH_AVAILABLE and self.console):
+                        self.output.render_markdown(full_response)
                     
                 except Exception as streaming_error:
                     # Fallback to non-streaming if streaming fails
