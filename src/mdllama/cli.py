@@ -225,8 +225,8 @@ class LLM_CLI:
                 full_response = ""
                 
                 if self.render_markdown and RICH_AVAILABLE and self.console:
-                    # Use Rich Live for real-time markdown rendering
-                    with Live(Markdown(""), console=self.console, refresh_per_second=10) as live_display:
+                    # Use Rich Live for real-time markdown rendering with vertical overflow visible
+                    with Live(Markdown(""), console=self.console, refresh_per_second=10, vertical_overflow="visible") as live_display:
                         for chunk in client.chat(messages, model, stream, temperature, max_tokens):
                             if 'message' in chunk and 'content' in chunk['message']:
                                 content = chunk['message']['content']
@@ -257,10 +257,6 @@ class LLM_CLI:
                         self.output.stream_response(buffer, Colors.GREEN)
                         
                     print()  # Add final newline
-                    
-                    # Render markdown after streaming if enabled but Rich not available
-                    if self.render_markdown:
-                        self.output.render_markdown(full_response)
             else:
                 response = client.chat(messages, model, stream, temperature, max_tokens)
                 if 'message' in response and 'content' in response['message']:
@@ -319,8 +315,8 @@ class LLM_CLI:
                     full_response = ""
                     
                     if self.render_markdown and RICH_AVAILABLE and self.console:
-                        # Use Rich Live for real-time markdown rendering
-                        with Live(Markdown(""), console=self.console, refresh_per_second=10) as live_display:
+                        # Use Rich Live for real-time markdown rendering with vertical overflow visible
+                        with Live(Markdown(""), console=self.console, refresh_per_second=10, vertical_overflow="visible") as live_display:
                             for chunk in client.chat(messages, model, True, temperature, max_tokens):
                                 if 'choices' in chunk and len(chunk['choices']) > 0:
                                     delta = chunk['choices'][0].get('delta', {})
@@ -353,10 +349,6 @@ class LLM_CLI:
                             self.output.stream_response(buffer, Colors.GREEN)
                         
                         print()  # Add final newline
-                        
-                        # Render markdown after streaming if enabled but Rich not available
-                        if self.render_markdown:
-                            self.output.render_markdown(full_response)
                     
                 except Exception as streaming_error:
                     # Fallback to non-streaming if streaming fails
