@@ -139,11 +139,39 @@ def semantic_version_to_int(version: str) -> int:
     :return: Integer representation of semantic version
     :rtype: int
     """
-    major, minor, patch = version.split(".")
-    major = int(major) << 16
-    minor = int(minor) << 8
-    patch = int(patch)
-    return major + minor + patch
+    try:
+        parts = version.split(".")
+        if len(parts) == 2:
+            # Handle versions like "20250726.4" - treat as major.minor with patch=0
+            major, minor, patch = int(parts[0]), int(parts[1]), 0
+        elif len(parts) == 3:
+            # Handle standard semantic versions like "1.2.3"
+            major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
+        else:
+            # Fallback for other formats
+            major, minor, patch = 0, 0, 0
+            if len(parts) >= 1:
+                try:
+                    major = int(parts[0])
+                except ValueError:
+                    major = 0
+            if len(parts) >= 2:
+                try:
+                    minor = int(parts[1])
+                except ValueError:
+                    minor = 0
+            if len(parts) >= 3:
+                try:
+                    patch = int(parts[2])
+                except ValueError:
+                    patch = 0
+        
+        major = major << 16
+        minor = minor << 8
+        return major + minor + patch
+    except Exception:
+        # If all else fails, return 0
+        return 0
 
 
 def int_to_semantic_version(version: int) -> str:
