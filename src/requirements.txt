@@ -2,3 +2,6 @@ requests
 ollama
 colorama
 rich
+textual>=0.45.0
+platformdirs
+pydantic

@@ -1,0 +1,184 @@
+/* mdllama TUI styles - based on oterm */
+
+/* Screen containers */
+.screen-container {
+    dock: top;
+    width: 100%;
+    height: 100%;
+    padding: 1;
+}
+
+.screen-container.full-height {
+    height: 100vh;
+}
+
+.screen-container.short {
+    height: auto;
+    max-height: 20;
+}
+
+/* Chat container */
+#chat-container {
+    height: 100%;
+    layout: vertical;
+}
+
+#messageContainer {
+    height: 1fr;
+    padding: 0 1;
+    scrollbar-gutter: stable;
+}
+
+#prompt {
+    dock: bottom;
+    height: 3;
+    margin: 1 0;
+}
+
+/* Chat edit screen */
+#model-info {
+    height: 3;
+    layout: horizontal;
+}
+
+#model-select {
+    height: 1fr;
+    margin: 1 0;
+}
+
+.system {
+    height: 10;
+    margin: 1 0;
+}
+
+.parameters {
+    height: 8;
+    margin: 1 0;
+}
+
+.format {
+    height: 6;
+    margin: 1 0;
+}
+
+.keep-alive {
+    width: 10;
+    margin: 0 1;
+}
+
+.button-container {
+    dock: bottom;
+    height: 3;
+    layout: horizontal;
+}
+
+/* Titles and labels */
+.title {
+    text-style: bold;
+    color: $accent;
+    margin: 1 0;
+}
+
+.name, .tag, .size {
+    margin: 0 1;
+    color: $text;
+}
+
+/* Log styles */
+.log {
+    background: $surface;
+    border: solid $primary;
+}
+
+.log:focus {
+    border: solid $accent;
+}
+
+/* Splash screen */
+#splash {
+    align: center middle;
+}
+
+#title {
+    text-style: bold;
+    color: $accent;
+    text-align: center;
+}
+
+#subtitle {
+    color: $text-muted;
+    text-align: center;
+    margin: 1 0;
+}
+
+#continue {
+    color: $text-muted;
+    text-align: center;
+    margin: 2 0;
+}
+
+/* Chat items */
+ChatItem {
+    padding: 0 1;
+    margin: 0 0 1 0;
+}
+
+/* Input styling */
+Input {
+    margin: 0 1;
+}
+
+Input:focus {
+    border: solid $accent;
+}
+
+/* Button styling */
+Button {
+    margin: 0 1;
+}
+
+Button.-primary {
+    background: $accent;
+    color: $text;
+}
+
+Button:hover {
+    background: $accent-lighten-1;
+}
+
+/* Pull model screen */
+#pull-model-container {
+    padding: 2;
+}
+
+/* General layout improvements */
+Horizontal {
+    height: auto;
+}
+
+Vertical {
+    width: 1fr;
+}
+
+/* Loading indicator */
+LoadingIndicator {
+    margin: 1;
+}
+
+/* Option list styling */
+OptionList {
+    border: solid $primary;
+}
+
+OptionList:focus {
+    border: solid $accent;
+}
+
+/* Text area styling */
+TextArea {
+    border: solid $primary;
+}
+
+TextArea:focus {
+    border: solid $accent;
+}

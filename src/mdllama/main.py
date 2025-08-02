@@ -78,6 +78,11 @@ def main():
     load_parser = subparsers.add_parser("load-session", help="Load a conversation session")
     load_parser.add_argument("session_id", help="Session ID to load")
 
+    # TUI command
+    tui_parser = subparsers.add_parser("tui", help="Start the terminal user interface")
+    tui_parser.add_argument("-p", "--provider", choices=["ollama", "openai"], default="ollama", help="Provider to use: ollama or openai (default: ollama)")
+    tui_parser.add_argument("--openai-api-base", help=argparse.SUPPRESS)
+
     # Ollama commands
     pull_parser = subparsers.add_parser("pull", help="Pull a model from Ollama registry")
     pull_parser.add_argument("model", help="Model name to pull")
@@ -175,6 +180,21 @@ def main():
             stream=args.stream,
             provider=provider
         )
+    elif args.command == "tui":
+        # Import TUI modules only when needed to avoid dependency issues
+        try:
+            from .tui.app import MDLlamaApp
+            provider = getattr(args, 'provider', 'ollama')
+            openai_api_base = getattr(args, 'openai_api_base', None)
+            app = MDLlamaApp(provider=provider, openai_api_base=openai_api_base)
+            app.run()
+        except ImportError as e:
+            cli.output.print_error(f"TUI dependencies not available: {e}")
+            cli.output.print_info("Install TUI dependencies with: pip install textual rich")
+            return
+        except Exception as e:
+            cli.output.print_error(f"Error starting TUI: {e}")
+            return
     elif args.command == "clear-context":
         cli.clear_context()
     elif args.command == "sessions":
