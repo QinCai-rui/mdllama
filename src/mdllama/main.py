@@ -19,7 +19,6 @@ def main():
     parser = argparse.ArgumentParser(description="mdllama - A command-line interface for Ollama API and OpenAI-compatible endpoints")
     parser.add_argument('--version', action='version', version=f'%(prog)s {get_version()}')
 
-    # Add provider and OpenAI-compatible endpoint option
     parser.add_argument('-p', '--provider', choices=['ollama', 'openai'], default=None, help='Provider to use: ollama or openai (default: ollama)')
     parser.add_argument('--openai-api-base', help='OpenAI-compatible API base URL (e.g. https://ai.hackclub.com)', default=None)
 
