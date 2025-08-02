@@ -118,6 +118,8 @@ class MDLlamaApp(App):
             ChatContainer(
                 chat_model=chat_model,
                 messages=[],
+                provider=self.provider,
+                openai_api_base=self.openai_api_base,
             )
         )
         await tabs.add_pane(pane)
@@ -208,7 +210,7 @@ class MDLlamaApp(App):
         up_to_date, _, latest = await is_up_to_date()
         if not up_to_date:
             self.notify(
-                f"[b]oterm[/b] version [i]{latest}[/i] is available, please update.",
+                f"[b]mdllama[/b] version [i]{latest}[/i] is available, please update.",
                 severity="warning",
             )
 
@@ -247,6 +249,8 @@ class MDLlamaApp(App):
                         container = ChatContainer(
                             chat_model=chat_model,
                             messages=messages,
+                            provider=self.provider,
+                            openai_api_base=self.openai_api_base,
                         )
                         pane = TabPane(
                             chat_model.name, container, id=f"chat-{chat_model.id}"

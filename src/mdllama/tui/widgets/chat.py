@@ -25,6 +25,7 @@ from ..prompt_history import PromptHistory
 from .image import ImageAdded
 from .prompt import FlexibleInput
 from ..ollamaclient import OllamaLLM
+from ..openai_llm import OpenAILLM
 from ..store.store import Store
 from ..types import ChatModel, MessageModel
 from ..utils import parse_response, throttle
@@ -36,7 +37,7 @@ def available_tool_calls():
 
 
 class ChatContainer(Widget):
-    ollama = OllamaLLM()
+    # Remove the static ollama instance
     messages: reactive[list[MessageModel]] = reactive([])
     images: list[tuple[Path, str]] = []
     BINDINGS = [
@@ -51,12 +52,18 @@ class ChatContainer(Widget):
         *children: Widget,
         messages: list[MessageModel] = [],
         chat_model: ChatModel,
+        provider: str = "ollama",
+        openai_api_base: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(*children, **kwargs)
 
         self.messages = messages
         self.chat_model = chat_model
+        self.provider = provider
+        self.openai_api_base = openai_api_base
+        
+        # Create the appropriate LLM client based on provider
         history = []
         # This is wrong, the images should be a list of Image objects
         # See https://github.com/ollama/ollama-python/issues/375
@@ -80,19 +87,51 @@ class ChatContainer(Widget):
             if tool_def["tool"] in chat_model.tools
         ]
 
-        self.ollama = OllamaLLM(
-            model=chat_model.model,
-            system=chat_model.system,
-            format=chat_model.format,
-            options=chat_model.parameters,
-            keep_alive=chat_model.keep_alive,
-            history=history,
-            tool_defs=used_tool_defs,
-            thinking=chat_model.thinking,
-        )
+        # Initialize the LLM client based on provider
+        self._create_llm_client(history, used_tool_defs)
         self.loaded = False
         self.loading = False
         self.images = []
+
+    def _create_llm_client(self, history=None, tool_defs=None):
+        """Create the appropriate LLM client based on provider"""
+        if history is None:
+            history = []
+        if tool_defs is None:
+            tool_defs = []
+            
+        if self.provider == "openai":
+            from ..config import envConfig
+            api_base = self.openai_api_base or envConfig.OPENAI_API_BASE
+            api_key = envConfig.OPENAI_API_KEY
+            
+            self.llm = OpenAILLM(
+                model=self.chat_model.model,
+                system=self.chat_model.system,
+                history=history,
+                format=self.chat_model.format,
+                keep_alive=self.chat_model.keep_alive,
+                tool_defs=tool_defs,
+                thinking=self.chat_model.thinking,
+                api_base=api_base,
+                api_key=api_key,
+                temperature=getattr(self.chat_model.parameters, 'temperature', 0.7),
+                max_tokens=getattr(self.chat_model.parameters, 'max_tokens', None),
+            )
+        else:  # Default to ollama
+            self.llm = OllamaLLM(
+                model=self.chat_model.model,
+                system=self.chat_model.system,
+                format=self.chat_model.format,
+                options=self.chat_model.parameters,
+                keep_alive=self.chat_model.keep_alive,
+                history=history,
+                tool_defs=tool_defs,
+                thinking=self.chat_model.thinking,
+            )
+        
+        # For compatibility, also set self.ollama to the client
+        self.ollama = self.llm
 
     def on_mount(self) -> None:
         self.query_one("#prompt").focus()
@@ -242,17 +281,8 @@ class ChatContainer(Widget):
             if tool_def["tool"] in self.chat_model.tools
         ]
 
-        # Recreate the Ollama client with updated parameters
-        self.ollama = OllamaLLM(
-            model=self.chat_model.model,
-            system=self.chat_model.system,
-            format=self.chat_model.format,
-            options=self.chat_model.parameters,
-            keep_alive=self.chat_model.keep_alive,
-            history=history,  # type: ignore
-            tool_defs=used_tool_defs,
-            thinking=self.chat_model.thinking,
-        )
+        # Recreate the LLM client with updated parameters
+        self._create_llm_client(history, used_tool_defs)
 
     @work
     async def action_rename_chat(self) -> None:
@@ -269,16 +299,8 @@ class ChatContainer(Widget):
     async def action_clear_chat(self) -> None:
         self.messages = []
         self.images = []
-        self.ollama = OllamaLLM(
-            model=self.ollama.model,
-            system=self.ollama.system,
-            format=self.ollama.format,  # type: ignore
-            options=self.chat_model.parameters,
-            keep_alive=self.ollama.keep_alive,
-            history=[],  # type: ignore
-            tool_defs=self.ollama.tool_defs,
-            thinking=self.chat_model.thinking,
-        )
+        # Recreate LLM client with empty history
+        self._create_llm_client([], self.ollama.tool_defs)
         msg_container = self.query_one("#messageContainer")
         for child in msg_container.children:
             child.remove()

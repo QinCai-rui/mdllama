@@ -55,10 +55,13 @@ class Store:
                     );
                 """
                 )
-                await self.set_user_version(metadata.version("oterm"))
+                await self.set_user_version("0.1.0")  # Default version when not installed as package
         else:
             # Upgrade database
-            current_version: str = metadata.version("oterm")
+            try:
+                current_version: str = metadata.version("mdllama")
+            except metadata.PackageNotFoundError:
+                current_version = "0.1.0"  # Fallback when not installed as package
             db_version = await self.get_user_version()
             for version, steps in upgrades:
                 if parse(current_version) >= parse(version) and parse(version) > parse(

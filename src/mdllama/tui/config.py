@@ -17,6 +17,9 @@ class EnvConfig(BaseModel):
     OTERM_VERIFY_SSL: bool = True
     OTERM_DATA_DIR: Path = get_default_data_dir()
     OPEN_WEATHER_MAP_API_KEY: str = ""
+    # OpenAI configuration
+    OPENAI_API_BASE: str = ""
+    OPENAI_API_KEY: str = ""
 
 
 envConfig = EnvConfig.model_validate(os.environ)

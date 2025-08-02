@@ -107,9 +107,9 @@ def get_default_data_dir() -> Path:
     """
     Get the user data directory for the current system platform.
 
-    Linux: ~/.local/share/oterm
-    macOS: ~/Library/Application Support/oterm
-    Windows: C:/Users/<USER>/AppData/Roaming/oterm
+    Linux: ~/.local/share/mdllama
+    macOS: ~/Library/Application Support/mdllama
+    Windows: C:/Users/<USER>/AppData/Roaming/mdllama
 
     :return: User Data Path
     :rtype: Path
@@ -117,13 +117,13 @@ def get_default_data_dir() -> Path:
     home = Path.home()
 
     system_paths = {
-        "win32": home / "AppData/Roaming/oterm",
+        "win32": home / "AppData/Roaming/mdllama",
         "linux": Path(os.getenv("XDG_DATA_HOME") or Path(home / ".local/share"))
-        / "oterm",
+        / "mdllama",
         "darwin": Path(
             os.getenv("XDG_DATA_HOME") or Path(home / "Library/Application Support")
         )
-        / "oterm",
+        / "mdllama",
     }
 
     data_path = system_paths[sys.platform]
@@ -163,16 +163,19 @@ def int_to_semantic_version(version: int) -> str:
 
 async def is_up_to_date() -> tuple[bool, Version, Version]:
     """
-    Checks whether oterm is current.
+    Checks whether mdllama is current.
 
-    :return: A tuple containing a boolean indicating whether oterm is current, the running version and the latest version
+    :return: A tuple containing a boolean indicating whether mdllama is current, the running version and the latest version
     :rtype: tuple[bool, Version, Version]
     """
 
     async with httpx.AsyncClient() as client:
-        running_version = parse(metadata.version("oterm"))
         try:
-            response = await client.get("https://pypi.org/pypi/oterm/json")
+            running_version = parse(metadata.version("mdllama"))
+        except metadata.PackageNotFoundError:
+            running_version = parse("0.1.0")  # Fallback when not installed as package
+        try:
+            response = await client.get("https://pypi.org/pypi/mdllama/json")
             data = response.json()
             pypi_version = parse(data["info"]["version"])
         except Exception:
@@ -200,7 +203,7 @@ async def check_ollama() -> bool:
             app = MDLlamaApp.current()
 
             app.notify(
-                f"The Ollama server is not reachable at {envConfig.OLLAMA_URL}, please check your connection or set the OLLAMA_URL environment variable. oterm will now quit.",
+                f"The Ollama server is not reachable at {envConfig.OLLAMA_URL}, please check your connection or set the OLLAMA_URL environment variable. mdllama will now quit.",
                 severity="error",
                 timeout=10,
             )
