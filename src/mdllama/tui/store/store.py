@@ -55,7 +55,12 @@ class Store:
                     );
                 """
                 )
-                await self.set_user_version("0.1.0")  # Default version when not installed as package
+                # Set database to current version since we're creating with the latest schema
+                try:
+                    current_version: str = metadata.version("mdllama")
+                except metadata.PackageNotFoundError:
+                    current_version = "0.1.0"  # Fallback when not installed as package
+                await self.set_user_version(current_version)
         else:
             # Upgrade database
             try:
