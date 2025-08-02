@@ -11,7 +11,7 @@ from textual.screen import ModalScreen
 from textual.widgets import DirectoryTree, Input, Label
 from textual_image.widget import Image
 
-from .app.widgets.image import IMAGE_EXTENSIONS, ImageDirectoryTree
+from .widgets.image import IMAGE_EXTENSIONS, ImageDirectoryTree
 
 
 class ImageSelect(ModalScreen[tuple[Path, str]]):

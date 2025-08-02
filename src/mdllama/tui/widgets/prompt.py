@@ -11,8 +11,8 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Button, Input, TextArea
 
-from .app.image_browser import ImageSelect
-from .app.widgets.image import ImageAdded
+from ..image_browser import ImageSelect
+from .image import ImageAdded
 
 
 class PostableTextArea(TextArea):

@@ -3,9 +3,9 @@ import itertools
 from mcp.types import ImageContent, PromptMessage, TextContent
 from ollama import Message
 
-from .log import log
-from .tools.mcp.client import MCPClient
-from .types import PromptCall
+from ...log import log
+from .client import MCPClient
+from ...types import PromptCall
 
 available_prompt_defs: dict[str, list[PromptCall]] = {}
 

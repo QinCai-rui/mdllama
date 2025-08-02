@@ -1,8 +1,8 @@
 from mcp import Tool as MCPTool
 from mcp.types import TextContent
 
-from .tools.mcp.client import MCPClient
-from .types import Tool
+from .client import MCPClient
+from ...types import Tool
 
 
 class MCPToolCallable:

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import aiosqlite
 
-from .ollamaclient import OllamaLLM, parse_ollama_parameters
+from ...ollamaclient import OllamaLLM, parse_ollama_parameters
 
 
 async def parameters(db_path: Path) -> None:

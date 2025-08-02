@@ -3,7 +3,7 @@ from importlib import import_module
 
 from ollama import Tool
 
-from .log import log
+from ..log import log
 from .types import ExternalToolDefinition, ToolCall
 
 

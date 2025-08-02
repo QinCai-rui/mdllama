@@ -10,8 +10,8 @@ from mcp.types import (
 )
 from ollama import ListResponse, Message, Options
 
-from .log import log
-from .ollamaclient import OllamaLLM
+from ...log import log
+from ...ollamaclient import OllamaLLM
 
 _DEFAULT_MODEL = "llama3.2"
 

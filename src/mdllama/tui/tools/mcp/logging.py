@@ -1,7 +1,7 @@
 from mcp.client.session import LoggingFnT
 from mcp.types import LoggingMessageNotificationParams
 
-from .log import log
+from ...log import log
 
 
 # This is here to log the messages from the MCP server, when

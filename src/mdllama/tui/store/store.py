@@ -4,11 +4,12 @@ from pathlib import Path
 
 import aiosqlite
 from packaging.version import parse
+from ollama import Tool
 
 from ..config import envConfig
 from .upgrades import upgrades
-from .types import ChatModel, MessageModel, Tool
-from .utils import int_to_semantic_version, semantic_version_to_int
+from ..types import ChatModel, MessageModel
+from ..utils import int_to_semantic_version, semantic_version_to_int
 
 
 class Store:

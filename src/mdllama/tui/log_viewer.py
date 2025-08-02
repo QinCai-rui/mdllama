@@ -4,7 +4,7 @@ from textual.reactive import reactive
 from textual.screen import ModalScreen
 from textual.widgets import Label, RichLog
 
-from .log import log_lines
+from ..log import log_lines
 from .utils import debounce
 
 

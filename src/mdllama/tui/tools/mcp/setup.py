@@ -1,7 +1,7 @@
 from mcp import Tool as MCPTool
 
 from .config import appConfig
-from .log import log
+from ...log import log
 from .tools.mcp.client import MCPClient
 from .tools.mcp.prompts import MCPPromptCallable
 from .tools.mcp.tools import MCPToolCallable, mcp_tool_to_ollama_tool
