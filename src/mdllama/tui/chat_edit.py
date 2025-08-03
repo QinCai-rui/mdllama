@@ -210,15 +210,26 @@ class ChatEdit(ModalScreen[str]):
             meta = self.models_info.get(model_meta.model or "")
             self.model_info = meta  # type: ignore
             if not self.edit_mode:
-                self.parameters = parse_ollama_parameters(
-                    self.model_info.parameters or ""
-                )
+                # Handle both ShowResponse and dict types
+                if isinstance(self.model_info, dict):
+                    parameters_text = self.model_info.get('parameters', '')
+                else:
+                    parameters_text = self.model_info.parameters or ""
+                self.parameters = parse_ollama_parameters(parameters_text)
             widget = self.query_one(".parameters", TextArea)
             widget.load_text(jsonify_options(self.parameters))
             widget = self.query_one(".system", TextArea)
 
-            # XXX Does not work as expected, there is no longer system in model_info
-            widget.load_text(self.system or self.model_info.get("system", ""))
+            # Handle system field for both ShowResponse and dict types
+            if isinstance(self.model_info, dict):
+                system_text = self.model_info.get('system', '')
+            else:
+                system_text = getattr(self.model_info, 'system', '')
+            
+            if system_text and not self.edit_mode:
+                widget.load_text(system_text)
+            elif not self.edit_mode:
+                widget.load_text(self.system)
 
             capabilities: list[str] = self.model_info.get("capabilities", [])
             tools_supported = "tools" in capabilities
