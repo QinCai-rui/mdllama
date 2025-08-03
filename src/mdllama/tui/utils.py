@@ -230,11 +230,19 @@ async def check_ollama() -> bool:
             from .app import MDLlamaApp
             app = MDLlamaApp.current()
 
-            app.notify(
-                f"The Ollama server is not reachable at {envConfig.OLLAMA_URL}, please check your connection or set the OLLAMA_URL environment variable. mdllama will now quit.",
-                severity="error",
-                timeout=10,
-            )
+            finally:
+        if not up:
+            from textual import get_current_app
+            try:
+                app = get_current_app()
+                app.notify(
+                    f"The Ollama server is not reachable at {envConfig.OLLAMA_URL}",
+                    title="Ollama Server Error",
+                    severity="error",
+                )
+            except Exception:
+                # If we can't get the current app, just ignore the notification
+                pass
 
             async def quit():
                 await asyncio.sleep(10.0)
