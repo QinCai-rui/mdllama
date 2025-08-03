@@ -169,7 +169,7 @@ def semantic_version_to_int(version: str) -> int:
         major = major << 16
         minor = minor << 8
         return major + minor + patch
-    except Exception:
+    except (ValueError, IndexError):
         # If all else fails, return 0
         return 0
 
@@ -206,7 +206,7 @@ async def is_up_to_date() -> tuple[bool, Version, Version]:
             response = await client.get("https://pypi.org/pypi/mdllama/json")
             data = response.json()
             pypi_version = parse(data["info"]["version"])
-        except Exception:
+        except (httpx.RequestError, KeyError, ValueError):
             # If no network connection, do not raise alarms.
             pypi_version = running_version
     return running_version >= pypi_version, running_version, pypi_version
@@ -227,24 +227,10 @@ async def check_ollama() -> bool:
         up = False
     finally:
         if not up:
-            from .app import MDLlamaApp
-            app = MDLlamaApp.current()
+            # Skip notification for now since we don't have reliable app access
+            pass
 
-            finally:
-        if not up:
-            from textual import get_current_app
-            try:
-                app = get_current_app()
-                app.notify(
-                    f"The Ollama server is not reachable at {envConfig.OLLAMA_URL}",
-                    title="Ollama Server Error",
-                    severity="error",
-                )
-            except Exception:
-                # If we can't get the current app, just ignore the notification
-                pass
-
-            async def quit():
+            async def quit_app():
                 await asyncio.sleep(10.0)
                 try:
                     from .tools.mcp.setup import teardown_mcp_servers
@@ -252,8 +238,8 @@ async def check_ollama() -> bool:
                     await teardown_mcp_servers()
                     exit()
 
-                except Exception:
+                except ImportError:
                     pass
 
-            asyncio.create_task(quit())
+            asyncio.create_task(quit_app())
     return up

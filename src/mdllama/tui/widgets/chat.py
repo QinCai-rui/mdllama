@@ -249,7 +249,16 @@ class ChatContainer(Widget):
 
     @work
     async def action_edit_chat(self) -> None:
-        screen = ChatEdit(chat_model=self.chat_model, edit_mode=True)
+        # Get provider info from the app
+        provider = getattr(self.app, 'provider', 'ollama')
+        openai_api_base = getattr(self.app, 'openai_api_base', None)
+        
+        screen = ChatEdit(
+            chat_model=self.chat_model, 
+            edit_mode=True,
+            provider=provider,
+            openai_api_base=openai_api_base
+        )
 
         model_info = await self.app.push_screen_wait(screen)
         if model_info is None:

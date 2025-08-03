@@ -10,6 +10,7 @@ from textual.containers import (
 from textual.reactive import reactive
 from textual.screen import ModalScreen
 from textual.widgets import Button, Checkbox, Input, Label, OptionList, TextArea
+from typing import Union, Any
 
 from .widgets.caps import Capabilities
 from .widgets.tool_select import ToolSelector
@@ -19,17 +20,18 @@ from .ollamaclient import (
     parse_format,
     parse_ollama_parameters,
 )
+from .openai_llm import OpenAILLM
 from .types import ChatModel, OtermOllamaOptions, Tool
 
 
 class ChatEdit(ModalScreen[str]):
     models = []
-    models_info: dict[str, ShowResponse] = {}
+    models_info: dict[str, Union[ShowResponse, dict[str, Any]]] = {}
 
     model_name: reactive[str] = reactive("")
     tag: reactive[str] = reactive("")
     bytes: reactive[int] = reactive(0)
-    model_info: ShowResponse
+    model_info: Union[ShowResponse, dict[str, Any]]
     system: reactive[str] = reactive("")
     parameters: reactive[Options] = reactive(Options())
     format: reactive[str] = reactive("")
@@ -48,8 +50,13 @@ class ChatEdit(ModalScreen[str]):
         self,
         chat_model: ChatModel | None = None,
         edit_mode: bool = False,
+        provider: str = "ollama",
+        openai_api_base: str | None = None,
     ) -> None:
         super().__init__()
+
+        self.provider = provider
+        self.openai_api_base = openai_api_base
 
         if chat_model is None:
             chat_model = ChatModel()
@@ -127,14 +134,50 @@ class ChatEdit(ModalScreen[str]):
                 break
 
     async def on_mount(self) -> None:
-        self.models = OllamaLLM.list().models
+        if self.provider == "openai":
+            # Handle OpenAI models
+            try:
+                models_response = OpenAILLM.list()
+                openai_models = models_response.get("models", [])
+                
+                # Convert OpenAI model format to match Ollama's expected structure
+                self.models = []
+                for model_info in openai_models:
+                    model_name = model_info.get("name", "")
+                    # Create a pseudo-model object that matches expected structure
+                    pseudo_model = type('Model', (), {
+                        'model': model_name,
+                        'name': model_name,
+                        'size': 0
+                    })()
+                    self.models.append(pseudo_model)
+                    
+                    # Create simplified model info for OpenAI
+                    self.models_info[model_name] = {
+                        'modelfile': f"# Model: {model_name}",
+                        'parameters': "temperature 0.7\nmax_tokens 2048",
+                        'system': None,
+                    }
+                    
+            except Exception as e:
+                self.app.notify(f"Error loading OpenAI models: {e}", severity="error")
+                self.models = []
+        else:
+            # Handle Ollama models (existing behavior)
+            try:
+                self.models = OllamaLLM.list().models
+                models = [model.model or "" for model in self.models]
+                for model in models:
+                    info = OllamaLLM.show(model)
+                    self.models_info[model] = info
+            except Exception as e:
+                self.app.notify(f"Error loading Ollama models: {e}", severity="error")
+                self.models = []
 
-        models = [model.model or "" for model in self.models]
-        for model in models:
-            info = OllamaLLM.show(model)
-            self.models_info[model] = info
         option_list = self.query_one("#model-select", OptionList)
         option_list.clear_options()
+        
+        models = [model.model or "" for model in self.models]
         for model in models:
             option_list.add_option(option=self.model_option(model))
         option_list.highlighted = self.last_highlighted_index

@@ -99,7 +99,9 @@ class MDLlamaApp(App):
     @work
     async def action_new_chat(self) -> None:
         store = await Store.get_store()
-        model_info: str | None = await self.push_screen_wait(ChatEdit())
+        model_info: str | None = await self.push_screen_wait(
+            ChatEdit(provider=self.provider, openai_api_base=self.openai_api_base)
+        )
         if not model_info:
             return
 
