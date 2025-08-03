@@ -35,6 +35,8 @@ class MDLlamaApp(App):
         super().__init__()
         self.provider = provider
         self.openai_api_base = openai_api_base
+        # Initialize dark mode setting
+        self.dark = appConfig.get("theme") == "dark"
 
     def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
         yield from super().get_system_commands(screen)
@@ -112,8 +114,8 @@ class MDLlamaApp(App):
         name = f"chat #{tab_count + 1} - {chat_model.model}"
         chat_model.name = name
 
-        id = await store.save_chat(chat_model)
-        chat_model.id = id
+        chat_id = await store.save_chat(chat_model)
+        chat_model.id = chat_id
 
         pane = TabPane(name, id=f"chat-{id}")
         pane.compose_add_child(
@@ -226,6 +228,7 @@ class MDLlamaApp(App):
                 self.theme = "textual-light"
             else:
                 self.theme = theme
+        # Update the dark mode setting
         self.dark = appConfig.get("theme") == "dark"
         self.watch(self.app, "theme", self.on_theme_change, init=False)
 
@@ -237,7 +240,7 @@ class MDLlamaApp(App):
 
         await self.load_mcp()
 
-        async def on_splash_done(message) -> None:
+        async def on_splash_done(_message) -> None:
             if not saved_chats:
                 # Pyright suggests awaiting here which has bitten me twice
                 # so I'm ignoring it
@@ -265,7 +268,7 @@ class MDLlamaApp(App):
         else:
             await on_splash_done("")
 
-    def on_theme_change(self, old_value: str, new_value: str) -> None:
+    def on_theme_change(self, _old_value: str, new_value: str) -> None:
         if appConfig.get("theme") != new_value:
             appConfig.set("theme", new_value)
 

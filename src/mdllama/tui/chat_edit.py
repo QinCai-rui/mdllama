@@ -96,8 +96,8 @@ class ChatEdit(ModalScreen[str]):
         f_area = self.query_one(".format", TextArea)
         try:
             parse_format(f_area.text)
-            format = f_area.text
-        except Exception:
+            format_text = f_area.text
+        except (ValueError, TypeError):
             self.app.notify("Error parsing format", severity="error")
             f_area.styles.animate("opacity", 0.0, final_value=1.0, duration=0.5)
             return
@@ -111,7 +111,7 @@ class ChatEdit(ModalScreen[str]):
             name=self.chat_model.name,
             model=model,
             system=system,
-            format=format,
+            format=format_text,
             parameters=parameters,
             keep_alive=keep_alive,
             tools=self.tools,
@@ -128,8 +128,10 @@ class ChatEdit(ModalScreen[str]):
 
     def select_model(self, model: str) -> None:
         select = self.query_one("#model-select", OptionList)
-        for index, option in enumerate(select._options):
-            if str(option.prompt) == model:
+        # Use the public options property instead of private _options
+        for index in range(select.option_count):
+            option = select.get_option_at_index(index)
+            if option and str(option.prompt) == model:
                 select.highlighted = index
                 break
 
@@ -159,18 +161,19 @@ class ChatEdit(ModalScreen[str]):
                         'system': None,
                     }
                     
-            except Exception as e:
+            except (ImportError, AttributeError, KeyError) as e:
                 self.app.notify(f"Error loading OpenAI models: {e}", severity="error")
                 self.models = []
         else:
             # Handle Ollama models (existing behavior)
             try:
-                self.models = OllamaLLM.list().models
+                list_response = OllamaLLM.list()
+                self.models = list_response.models
                 models = [model.model or "" for model in self.models]
                 for model in models:
                     info = OllamaLLM.show(model)
                     self.models_info[model] = info
-            except Exception as e:
+            except (ConnectionError, AttributeError) as e:
                 self.app.notify(f"Error loading Ollama models: {e}", severity="error")
                 self.models = []
 
