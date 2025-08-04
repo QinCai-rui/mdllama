@@ -24,7 +24,7 @@ mdllama makes it easy to interact with Ollama's AI models directly from your com
 ![Chat](https://raw.githubusercontent.com/QinCai-rui/mdllama/refs/heads/main/assets/chat.png)
 
 ### Help
-![Help](https://raw.githubusercontent.com/QinCai-rui/mdllama/refs/heads/main/assets/help.png)
+![Help](https://github.com/user-attachments/assets/bb080fe0-9e7b-4ba0-b9c8-f4fe1415082f)
 
 ## Live Demo
 
