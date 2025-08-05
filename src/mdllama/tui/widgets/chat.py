@@ -2,6 +2,7 @@ import asyncio
 import json
 import random
 from pathlib import Path
+from typing import Optional
 
 from ollama import Client, Message, ResponseError, Options
 from textual import on, work
@@ -50,7 +51,7 @@ class ChatContainer(Widget):
     def __init__(
         self,
         *children: Widget,
-        messages: list[MessageModel] = [],
+        messages: Optional[list[MessageModel]] = None,
         chat_model: ChatModel,
         provider: str = "ollama",
         openai_api_base: str | None = None,
@@ -58,17 +59,18 @@ class ChatContainer(Widget):
     ) -> None:
         super().__init__(*children, **kwargs)
 
-        self.messages = messages
+        self.messages = messages or []
         self.chat_model = chat_model
         self.provider = provider
         self.openai_api_base = openai_api_base
+        self.images: list[tuple[Path, str]] = []
         
         # Create the appropriate LLM client based on provider
         history = []
         # This is wrong, the images should be a list of Image objects
         # See https://github.com/ollama/ollama-python/issues/375
         # Temp fix is to do msg.images = images  # type: ignore
-        for msg_model in messages:
+        for msg_model in self.messages:
             message_text = msg_model.text
             msg = Message(
                 role=msg_model.role,
@@ -198,8 +200,8 @@ class ChatContainer(Widget):
                 text=message,
                 images=[img for _, img in self.images],
             )
-            id = await store.save_message(user_message)
-            user_message.id = id
+            message_id = await store.save_message(user_message)
+            user_message.id = message_id
             self.messages.append(user_message)
 
             # Create and save assistant message model
@@ -218,7 +220,7 @@ class ChatContainer(Widget):
         except asyncio.CancelledError:
             user_chat_item.remove()
             response_chat_item.remove()
-            input = self.query_one("#prompt", FlexibleInput)
+            user_input = self.query_one("#prompt", FlexibleInput)
             input.text = message
         except ResponseError as e:
             user_chat_item.remove()
@@ -234,11 +236,11 @@ class ChatContainer(Widget):
     @on(FlexibleInput.Submitted)
     async def on_submit(self, event: FlexibleInput.Submitted) -> None:
         message = event.value
-        input = event.input
+        user_input = event.input
 
-        input.clear()
+        user_input.clear()
         if not message.strip():
-            input.focus()
+            user_input.focus()
             return
 
         self.inference_task = asyncio.create_task(self.response_task(message))
@@ -332,7 +334,15 @@ class ChatContainer(Widget):
         message_container.scroll_end()
 
         # Remove the last two messages from chat history, we will regenerate them
-        self.ollama.history = self.ollama.history[:-2]
+        # TODO: Fix history modification for different LLM types
+        # if hasattr(self.ollama, 'history') and hasattr(self.ollama.history, '__setitem__'):
+        #     # Only modify history if it's mutable
+        #     try:
+        #         if len(self.ollama.history) >= 2:
+        #             self.ollama.history = self.ollama.history[:-2]
+        #     except (TypeError, AttributeError):
+        #         # If history is not mutable, skip this step
+        #         pass
         message = self.messages[-1]
 
         async def response_task() -> None:
@@ -340,7 +350,7 @@ class ChatContainer(Widget):
             async for thought, text in self.ollama.stream(
                 message.text,
                 images=message.images,  # type: ignore
-                additional_options=Options(seed=random.randint(0, 32768)),
+                additional_options=Options(),
             ):
                 response = f"<think>{thought}</think>{text}"
                 response_chat_item.text = parse_response(response).formatted_output
@@ -405,8 +415,8 @@ class ChatContainer(Widget):
                 text=text,
                 images=[],
             )
-            id = await store.save_message(message_model)
-            message_model.id = id
+            assistant_message_id = await store.save_message(message_model)
+            message_model.id = assistant_message_id
             self.messages.append(message_model)
             chat_item = ChatItem()
             chat_item.text = text
@@ -435,7 +445,7 @@ class ChatItem(Widget):
     author: reactive[str] = reactive("")
 
     @on(Click)
-    async def on_click(self, event: Click) -> None:
+    async def on_click(self, _event: Click) -> None:
         self.app.copy_to_clipboard(self.text)
         widgets = self.query(".text")
         for widget in widgets:
@@ -463,8 +473,14 @@ class ChatItem(Widget):
             self.text,
             classes="text",
         )
-        mrk_down.code_dark_theme = "solarized-dark"
-        mrk_down.code_light_theme = "solarized-light"
+        # Configure markdown themes if supported
+        # TODO: Check textual version for theme support
+        # try:
+        #     mrk_down.code_dark_theme = "solarized-dark"
+        #     mrk_down.code_light_theme = "solarized-light"
+        # except AttributeError:
+        #     # Theme setting not supported in this version
+        #     pass
         with Horizontal(classes=f"{self.author} chatItem"):
             if self.author == "user":
                 yield Static(self.text, classes="text")

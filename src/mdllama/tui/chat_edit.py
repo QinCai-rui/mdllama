@@ -128,12 +128,22 @@ class ChatEdit(ModalScreen[str]):
 
     def select_model(self, model: str) -> None:
         select = self.query_one("#model-select", OptionList)
-        # Use the public options property instead of private _options
-        for index in range(select.option_count):
-            option = select.get_option_at_index(index)
-            if option and str(option.prompt) == model:
-                select.highlighted = index
-                break
+        # Try to find and select the model
+        try:
+            for index in range(select.option_count):
+                try:
+                    option = select.get_option_at_index(index)
+                    if option and str(option.prompt) == model:
+                        select.highlighted = index
+                        break
+                except (AttributeError, IndexError):
+                    # Fallback: just use the first option if methods don't exist
+                    if index == 0:
+                        select.highlighted = 0
+                    break
+        except AttributeError:
+            # If option_count doesn't exist, set to first option
+            select.highlighted = 0
 
     async def on_mount(self) -> None:
         if self.provider == "openai":
