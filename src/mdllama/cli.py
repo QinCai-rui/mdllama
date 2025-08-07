@@ -13,6 +13,7 @@ from .openai_client import OpenAIClient
 from .input_utils import input_with_history, read_multiline_input
 from .session import SessionManager
 from .model_manager import ModelManager
+from .web_search import DuckDuckGoSearch, create_search_prompt_enhancement
 
 try:
     from rich.console import Console
@@ -37,6 +38,10 @@ class LLM_CLI:
         # Initialize clients
         self.ollama_client = None
         self.openai_client = None
+        
+        # Initialise web search
+        self.search_client = DuckDuckGoSearch(self.output)
+        self._pending_search_query = None  # For interactive chat web search enhancement
         
     def setup(self, ollama_host: Optional[str] = None, openai_api_base: Optional[str] = None, provider: str = "ollama"):
         """Set up the CLI with Ollama or OpenAI-compatible configuration."""
@@ -114,6 +119,167 @@ class LLM_CLI:
     def show_model_chooser(self, provider: str = "ollama") -> Optional[str]:
         """Show a numbered list of available models and allow user to choose."""
         return self.model_manager.show_model_chooser(provider)
+    
+    def web_search(self, query: str, max_results: int = 5) -> str:
+        """
+        Perform a web search using DuckDuckGo and return formatted results.
+        
+        Args:
+            query: The search query
+            max_results: Maximum number of results to return (default: 5)
+        
+        Returns:
+            Formatted search results
+        """
+        self.output.print_info(f"Searching the web for: {query}")
+        return self.search_client.search_and_format(query, max_results)
+    
+    def _generate_search_query(self, question: str, provider: str = "openai") -> str:
+        """
+        Generate an effective search query based on a user's question using AI.
+        
+        Args:
+            question: The user's question
+            provider: Which AI provider to use for generating the search query
+            
+        Returns:
+            AI-generated optimized search query
+        """
+        search_prompt = f"""You are a search query optimizer. Convert this user input into an effective web search query.
+
+Input: "{question}"
+
+Your task:
+1. Fix any spelling errors (e.g., "limux" → "linux")
+2. Remove question words (what, how, why, etc.)
+3. Extract key terms that would appear in search results
+4. Make it concise but specific (5-10 words)
+5. Use proper spelling and common terminology
+
+Examples:
+Input: "what is the latest limux kernal version?"
+Output: linux kernel latest version kernel.org
+
+Input: "how do i install python on ubuntu?"
+Output: install python ubuntu
+
+Input: "is there no 6.12.x kernel?"
+Output: linux kernel 6.12 release
+
+Now convert: "{question}"
+
+Search query:"""
+
+        try:
+            # Create a simple message for the AI
+            messages = [{"role": "user", "content": search_prompt}]
+            
+            # Try to use the configured provider to generate the search query
+            if provider == "openai" and self.config.get('openai_api_base'):
+                try:
+                    openai_client = OpenAIClient(self.config['openai_api_base'], self.config)
+                    # Try different models in order of preference
+                    for model_name in ["gpt-4", "gpt-3.5-turbo", "gpt-4o-mini", "gpt-4o"]:
+                        try:
+                            response = openai_client.chat(messages, model_name, False, 0.3, 30)
+                            if 'choices' in response and len(response['choices']) > 0:
+                                search_query = response['choices'][0]['message']['content'].strip()
+                                # Clean up the response - remove quotes and extra text
+                                import re
+                                search_query = re.sub(r'^["\']|["\']$', '', search_query)
+                                search_query = re.sub(r'(Search query:|Output:)\s*', '', search_query, flags=re.IGNORECASE)
+                                search_query = search_query.strip()
+                                if search_query and len(search_query) > 2:
+                                    return search_query[:100]  # Limit length
+                                break
+                        except Exception as model_error:
+                            continue  # Try next model
+                except Exception as e:
+                    self.output.print_info(f"OpenAI query generation failed: {str(e)[:50]}...")
+            
+            # Try Ollama as fallback
+            try:
+                ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
+                if ollama_client.is_available():
+                    # Use a simpler model that's more likely to be available
+                    response = ollama_client.chat(messages, "llama3.2:1b", False, 0.3, 30)
+                    if 'message' in response and 'content' in response['message']:
+                        search_query = response['message']['content'].strip()
+                        # Clean up the response
+                        import re
+                        search_query = re.sub(r'^["\']|["\']$', '', search_query)
+                        search_query = re.sub(r'(Search query:|Output:)\s*', '', search_query, flags=re.IGNORECASE)
+                        search_query = search_query.strip()
+                        if search_query and len(search_query) > 2:
+                            return search_query[:100]  # Limit length
+            except Exception as e:
+                self.output.print_info(f"Ollama query generation failed: {str(e)[:50]}...")
+                        
+        except Exception as e:
+            # Fallback to simple keyword extraction if AI generation fails
+            pass
+            
+        # Enhanced fallback: Smart keyword extraction with spelling fixes
+        import re
+        
+        # Common spelling fixes
+        spelling_fixes = {
+            'limux': 'linux',
+            'kernal': 'kernel',
+            'ubunto': 'ubuntu',
+            'phyton': 'python',
+            'pythong': 'python',
+            'javascipt': 'javascript',
+            'programing': 'programming',
+            'developement': 'development',
+            'enviroment': 'environment',
+            'wat': 'what',
+            'wot': 'what',
+            'wen': 'when',
+            'wher': 'where',
+            'artihicial': 'artificial',
+            'artifical': 'artificial',
+            'inteligence': 'intelligence',
+            'intellegince': 'intelligence',
+            'intelligance': 'intelligence',
+            'artifical': 'artificial',
+            'machien': 'machine',
+            'learnig': 'learning',
+            'lerning': 'learning',
+            'algoritm': 'algorithm',
+            'algorith': 'algorithm'
+        }
+        
+        # Apply spelling fixes
+        question_fixed = question.lower()
+        for wrong, correct in spelling_fixes.items():
+            question_fixed = re.sub(r'\b' + wrong + r'\b', correct, question_fixed)
+        
+        # Remove question words but keep important terms
+        question_words = [
+            'what', 'is', 'the', 'how', 'do', 'does', 'can', 'could', 'would', 'should',
+            'why', 'when', 'where', 'who', 'which', 'a', 'an', 'are', 'was', 'were',
+            'will', 'have', 'has', 'had', 'be', 'been', 'being', 'there', 'no'
+        ]
+        
+        words = re.findall(r'\b\w+\b', question_fixed)
+        filtered_words = [word for word in words if word not in question_words and len(word) > 2]
+        
+        # Take the most important words
+        search_query = ' '.join(filtered_words[:5])
+        
+        # If still too short, try a different approach
+        if len(search_query.split()) < 2:
+            # Remove common question patterns but keep the core content
+            cleaned = re.sub(r'^(what|how|why|when|where|who|which)\s+(is|are|do|does|can|could|would|should)\s*', '', question_fixed.strip())
+            cleaned = re.sub(r'\?+$', '', cleaned).strip()
+            if cleaned and len(cleaned) > 3:
+                search_query = cleaned
+        
+        # Final cleanup
+        search_query = re.sub(r'\?+$', '', search_query).strip()
+        
+        return search_query or question_fixed.strip()
             
     def _prepare_messages(self, prompt: str, system_prompt: Optional[str] = None) -> List[Dict[str, Any]]:
         """Prepare messages for completion, including context."""
@@ -159,11 +325,23 @@ class LLM_CLI:
                  keep_context: bool = True,
                  save_history: bool = False,
                  provider: Optional[str] = None,
-                 openai_api_base: Optional[str] = None) -> Optional[str]:
+                 openai_api_base: Optional[str] = None,
+                 web_search_query: Optional[str] = None,
+                 max_search_results: int = 3) -> Optional[str]:
         """Generate a completion using the configured provider."""
         
         # Process file attachments
         prompt = self._process_file_attachments(prompt, file_paths)
+        
+        # Enhance prompt with web search results if requested
+        if web_search_query:
+            self.output.print_info(f"Searching the web for: {web_search_query}")
+            search_results = self.search_client.search(web_search_query, max_search_results)
+            if search_results:
+                prompt = create_search_prompt_enhancement(prompt, search_results)
+                self.output.print_success(f"Enhanced prompt with {len(search_results)} web search results")
+            else:
+                self.output.print_info("No web search results found")
         
         # Prepare messages
         messages = self._prepare_messages(prompt, system_prompt)
@@ -437,17 +615,21 @@ class LLM_CLI:
             
         # Print help
         self.output.print_info("Interactive chat commands:")
-        self.output.print_command("exit/quit      - Exit the chat session")
-        self.output.print_command("clear          - Clear the conversation context")
-        self.output.print_command("file:<path>    - Include a file in your next message (max 2MB)")
-        self.output.print_command("system:<prompt>- Set or change the system prompt")
-        self.output.print_command("temp:<value>   - Change the temperature setting")
-        self.output.print_command("model:<name>   - Switch to a different model")
-        self.output.print_command("models         - Show available models with numbers")
-        self.output.print_command('"""           - Start/end a multiline message')
+        self.output.print_command("exit/quit        - Exit the chat session")
+        self.output.print_command("clear            - Clear the conversation context")
+        self.output.print_command("file:<path>      - Include a file in your next message (max 2MB)")
+        self.output.print_command("system:<prompt>  - Set or change the system prompt")
+        self.output.print_command("temp:<value>     - Change the temperature setting")
+        self.output.print_command("model:<name>     - Switch to a different model")
+        self.output.print_command("search:<query>   - Search the web and add results to context")
+        self.output.print_command("searchask:<query>|<question> - Search and immediately ask about results")
+        self.output.print_command("searchask:<query> - Search and ask for summary")
+        self.output.print_command("websearch:<question> - AI-powered search: auto-generate query and answer")
+        self.output.print_command("models           - Show available models with numbers")
+        self.output.print_command('"""              - Start/end a multiline message')
         self.output.print_info("Keyboard shortcuts:")
-        self.output.print_command("Ctrl+C         - Interrupt model response (not for exiting)")
-        self.output.print_command("Ctrl+D         - Exit the chat session")
+        self.output.print_command("Ctrl+C           - Interrupt model response (not for exiting)")
+        self.output.print_command("Ctrl+D           - Exit the chat session")
         print()
         
         # Add system prompt if provided
@@ -536,6 +718,92 @@ class LLM_CLI:
                 else:
                     self.output.print_error("Please specify a model name.")
                 continue
+            elif user_input.startswith('search:'):
+                search_query = user_input[7:].strip()
+                if search_query:
+                    search_results_text = self.web_search(search_query)
+                    print(search_results_text)
+                    print()
+                    
+                    # Add search results to conversation context as a system message
+                    search_context = f"Web search results for '{search_query}':\n{search_results_text}"
+                    self.session_manager.current_context.append({
+                        "role": "system", 
+                        "content": search_context
+                    })
+                    self.output.print_success(f"Search results added to conversation context. You can now ask questions about the search results.")
+                else:
+                    self.output.print_error("Please specify a search query.")
+                continue
+            elif user_input.startswith('searchask:'):
+                # Format: searchask:query|question
+                # e.g., "searchask:Python 3.13|What are the new features?"
+                parts = user_input[10:].strip().split('|', 1)
+                if len(parts) == 2:
+                    search_query, question = parts[0].strip(), parts[1].strip()
+                    
+                    # Perform search and add to context
+                    search_results_text = self.web_search(search_query)
+                    search_context = f"Web search results for '{search_query}':\n{search_results_text}"
+                    self.session_manager.current_context.append({
+                        "role": "system", 
+                        "content": search_context
+                    })
+                    
+                    # Now ask the question - this will be processed as a regular prompt
+                    user_input = question
+                    self.output.print_success(f"Search completed for '{search_query}'. Now asking: {question}")
+                    print()
+                    # Don't continue here - let it fall through to process the question
+                elif len(parts) == 1 and parts[0]:
+                    # Just search query, ask a default question
+                    search_query = parts[0].strip()
+                    search_results_text = self.web_search(search_query)
+                    search_context = f"Web search results for '{search_query}':\n{search_results_text}"
+                    self.session_manager.current_context.append({
+                        "role": "system", 
+                        "content": search_context
+                    })
+                    
+                    user_input = f"Based on the search results above, please summarize the key information about {search_query}."
+                    self.output.print_success(f"Search completed for '{search_query}'. Asking for summary.")
+                    print()
+                    # Don't continue here - let it fall through to process the question
+                else:
+                    self.output.print_error("Please specify a search query. Format: searchask:query|question or searchask:query")
+                    continue
+            elif user_input.startswith('websearch:'):
+                question = user_input[10:].strip()
+                if question:
+                    # Generate search query from the question using AI
+                    self.output.print_info("Generating search query using AI...")
+                    try:
+                        search_query = self._generate_search_query(question, provider)
+                        self.output.print_success(f"AI generated query: '{search_query}'")
+                        
+                        # Show if spelling was corrected
+                        if search_query.lower() != question.lower():
+                            self.output.print_info(f"Original: '{question}' → Optimized: '{search_query}'")
+                        
+                        # Perform search and add to context
+                        search_results_text = self.web_search(search_query, max_results=3)
+                        search_context = f"Web search results for '{search_query}':\n{search_results_text}"
+                        self.session_manager.current_context.append({
+                            "role": "system", 
+                            "content": search_context
+                        })
+                        
+                        # Now ask the question - this will be processed as a regular prompt
+                        user_input = question
+                        self.output.print_success(f"Search completed for '{search_query}'. Now answering: {question}")
+                        print()
+                        # Don't continue here - let it fall through to process the question
+                    except Exception as e:
+                        self.output.print_error(f"Search failed: {e}")
+                        continue
+                else:
+                    self.output.print_error("Please specify a question after websearch:")
+                    continue
             elif user_input.strip() == '"""':
                 user_input = read_multiline_input()
                 self.output.print_success("Multiline input received")
@@ -552,6 +820,10 @@ class LLM_CLI:
             # Use streaming if requested, with fallback for OpenAI compatibility issues
             use_streaming = stream
             try:
+                # Check if we have a pending web search query
+                search_query = self._pending_search_query
+                self._pending_search_query = None  # Clear after use
+                
                 self.complete(
                     prompt=user_input,
                     model=model,
@@ -560,7 +832,9 @@ class LLM_CLI:
                     max_tokens=max_tokens,
                     keep_context=True,
                     save_history=False,
-                    provider=provider
+                    provider=provider,
+                    web_search_query=search_query,
+                    max_search_results=3
                 )
             except KeyboardInterrupt:
                 # CTRL-C interrupts the current response but continues the chat

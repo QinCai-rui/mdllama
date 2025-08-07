@@ -55,6 +55,8 @@ def main():
     chat_parser.add_argument("-p", "--provider", choices=["ollama", "openai"], default=None, help="Provider to use: ollama or openai (default: ollama)")
     chat_parser.add_argument("--openai-api-base", help=argparse.SUPPRESS)
     chat_parser.add_argument("--prompt-file", help="Path to file containing the prompt")
+    chat_parser.add_argument("--web-search", help="Enhance prompt with web search results for this query")
+    chat_parser.add_argument("--max-search-results", type=int, default=3, help="Maximum number of web search results to include (default: 3)")
 
     # Interactive chat command
     interactive_parser = subparsers.add_parser("run", help="Start an interactive chat session")
@@ -68,6 +70,12 @@ def main():
     interactive_parser.add_argument("--render-markdown", "-r", action="store_true", help="Render markdown in the response")
     interactive_parser.add_argument("-p", "--provider", choices=["ollama", "openai"], default=None, help="Provider to use: ollama or openai (default: ollama)")
     interactive_parser.add_argument("--openai-api-base", help=argparse.SUPPRESS)
+
+    # Web search function
+    search_parser = subparsers.add_parser("search", help="Search the web using DuckDuckGo")
+    search_parser.add_argument("query", help="Search query")
+    search_parser.add_argument("--max-results", "-n", type=int, default=5, help="Maximum number of results to return (default: 5, max: 10)")
+    search_parser.add_argument("--no-color", action="store_true", help="Disable colored output")
 
     # Context and history management
     subparsers.add_parser("clear-context", help="Clear the current conversation context")
@@ -98,9 +106,10 @@ def main():
         use_colors = False
 
     # Initialize CLI
-    render_markdown = False
-    if hasattr(args, 'render_markdown') and args.render_markdown:
-        render_markdown = True
+    # Enable markdown rendering by default WHEN Rich is available, UNLESS explicitly disabled
+    render_markdown = True
+    if hasattr(args, 'render_markdown'):
+        render_markdown = args.render_markdown
 
     cli = LLM_CLI(use_colors=use_colors, render_markdown=render_markdown)
 
@@ -119,6 +128,9 @@ def main():
         provider = getattr(args, 'provider', None)
         openai_api_base = getattr(args, 'openai_api_base', None)
         cli.list_models(provider=provider, openai_api_base=openai_api_base)
+    elif args.command == "search":
+        search_results = cli.web_search(args.query, args.max_results)
+        print(search_results)
     elif args.command == "chat":
         # Handle prompt from file or argument
         prompt = args.prompt
@@ -148,7 +160,9 @@ def main():
             keep_context=args.context,
             save_history=args.save,
             provider=provider,
-            openai_api_base=openai_api_base
+            openai_api_base=openai_api_base,
+            web_search_query=getattr(args, 'web_search', None),
+            max_search_results=getattr(args, 'max_search_results', 3)
         )
     elif args.command == "run":
         provider = getattr(args, 'provider', None) or 'ollama'
