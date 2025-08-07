@@ -107,9 +107,10 @@ def main():
         use_colors = False
 
     # Initialize CLI
-    render_markdown = False
-    if hasattr(args, 'render_markdown') and args.render_markdown:
-        render_markdown = True
+    # Enable markdown rendering by default wHEN Rich is available, UNLESS explicitly disabled
+    render_markdown = True
+    if hasattr(args, 'render_markdown'):
+        render_markdown = args.render_markdown
 
     cli = LLM_CLI(use_colors=use_colors, render_markdown=render_markdown)
 
