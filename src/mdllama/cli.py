@@ -134,120 +134,186 @@ class LLM_CLI:
         self.output.print_info(f"Searching the web for: {query}")
         return self.search_client.search_and_format(query, max_results)
     
-    def _generate_search_query(self, question: str, provider: str = "openai") -> str:
+    def _generate_search_query(self, question: str, provider: str = "openai", model: Optional[str] = None) -> str:
         """
         Generate an effective search query based on a user's question using AI.
         
         Args:
             question: The user's question
             provider: Which AI provider to use for generating the search query
+            model: The specific model to use for generation (uses current model if provided)
             
         Returns:
             AI-generated optimized search query
         """
+        # Get recent conversation context for better search query generation
+        context_messages = []
+        if hasattr(self.session_manager, 'current_context') and self.session_manager.current_context:
+            # Get the last few messages for context (skip system messages)
+            recent_messages = [msg for msg in self.session_manager.current_context[-6:] 
+                             if msg.get('role') in ['user', 'assistant']]
+            if recent_messages:
+                context_text = "\n".join([f"{msg['role'].title()}: {msg['content']}" 
+                                        for msg in recent_messages[-4:]])  # Last 4 messages
+                context_messages.append(f"\nRecent conversation context:\n{context_text}")
+        
+        context_str = "".join(context_messages) if context_messages else ""
+        
         search_prompt = f"""You are a search query optimizer. Convert this user input into an effective web search query.
 
-Input: "{question}"
+Input: "{question}"{context_str}
 
-Your task:
-1. Fix any spelling errors (e.g., "limux" → "linux")
-2. Remove question words (what, how, why, etc.)
-3. Extract key terms that would appear in search results
-4. Make it concise but specific (5-10 words)
-5. Use proper spelling and common terminology
+Instructions:
+1. Consider the conversation context when generating the search query
+2. Fix any spelling errors (e.g., "limux" → "linux", "artihicial" → "artificial")
+3. Remove question words (what, how, why, etc.) but preserve important context
+4. Extract key terms that would appear in search results
+5. Make it concise but specific (3-8 words)
+6. Use proper spelling and common terminology
+7. If the question refers to something mentioned earlier in context, include relevant details
 
 Examples:
 Input: "what is the latest limux kernal version?"
-Output: linux kernel latest version kernel.org
+Output: linux kernel latest version
 
 Input: "how do i install python on ubuntu?"
 Output: install python ubuntu
 
-Input: "is there no 6.12.x kernel?"
-Output: linux kernel 6.12 release
+Input: "wat is artihicial intelledasdgince"
+Output: artificial intelligence
 
 Now convert: "{question}"
 
-Search query:"""
+Respond with ONLY the optimized search query, nothing else:"""
 
+        # Normalize provider name to lowercase
+        provider = provider.lower()
+        
         try:
             # Create a simple message for the AI
             messages = [{"role": "user", "content": search_prompt}]
             
+            self.output.print_info(f"Attempting to use {provider} for search query generation...")
+            
             # Try to use the configured provider to generate the search query
-            if provider == "openai" and self.config.get('openai_api_base'):
-                try:
-                    openai_client = OpenAIClient(self.config['openai_api_base'], self.config)
-                    # Try different models in order of preference
-                    for model_name in ["gpt-4", "gpt-3.5-turbo", "gpt-4o-mini", "gpt-4o"]:
+            if provider == "openai":
+                api_base = self.config.get('openai_api_base')
+                self.output.print_info(f"OpenAI API base: {api_base}")
+                
+                if api_base:
+                    try:
+                        openai_client = OpenAIClient(api_base, self.config)
+                        self.output.print_info("OpenAI client created, testing connection...")
+                        
+                        # Use provided model or try different models in order of preference
+                        if model:
+                            models_to_try = [model, "llama3-8b-8192", "mixtral-8x7b-32768", "gpt-4o-mini", "gpt-3.5-turbo"]
+                            self.output.print_info(f"Using current model: {model} (with fallbacks)")
+                        else:
+                            models_to_try = ["llama3-8b-8192", "mixtral-8x7b-32768", "gpt-4o-mini", "gpt-3.5-turbo", "gpt-4", "gpt-4o"]
+                            self.output.print_info("No specific model provided, trying default models")
+                        
+                        for model_name in models_to_try:
+                            try:
+                                self.output.print_info(f"Trying OpenAI model: {model_name}")
+                                response = openai_client.chat(messages, model_name, False, 0.3, 30)
+                                self.output.print_info(f"OpenAI response received: {type(response)}")
+                                
+                                if 'choices' in response and len(response['choices']) > 0:
+                                    choice = response['choices'][0]
+                                    search_query = choice['message']['content'].strip()
+                                    self.output.print_info(f"Raw AI response: {repr(search_query)}")
+                                    
+                                    # Check if response is empty
+                                    if not search_query or search_query == '':
+                                        self.output.print_info(f"Model {model_name} returned empty response, trying next model...")
+                                        continue
+                                    
+                                    self.output.print_success(f"AI generated query: '{search_query}'")
+                                    
+                                    # Clean up the response - remove quotes and extra text
+                                    import re
+                                    search_query = re.sub(r'^["\']|["\']$', '', search_query)
+                                    search_query = re.sub(r'(Search query:|Output:)\s*', '', search_query, flags=re.IGNORECASE)
+                                    search_query = search_query.strip()
+                                    if search_query and len(search_query) > 2:
+                                        self.output.print_success(f"Using AI-generated query: '{search_query[:100]}'")
+                                        return search_query[:100]  # Limit length
+                                    else:
+                                        self.output.print_info(f"Cleaned query too short: {repr(search_query)}, trying next model...")
+                                        continue
+                                break
+                            except Exception as model_error:
+                                self.output.print_info(f"Model {model_name} failed: {str(model_error)[:100]}")
+                                continue  # Try next model
+                    except Exception as e:
+                        self.output.print_info(f"OpenAI query generation failed: {str(e)}")
+                else:
+                    self.output.print_info("No OpenAI API base configured")
+            
+            # Try Ollama as fallback or primary choice
+            self.output.print_info("Trying Ollama for search query generation...")
+            try:
+                ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
+                is_available = ollama_client.is_available()
+                self.output.print_info(f"Ollama available: {is_available}")
+                
+                if is_available:
+                    # Use provided model or try multiple models in order of preference
+                    if model:
+                        models_to_try = [model, "llama3.2:1b", "llama3:8b", "llama2", "gemma2:2b", "qwen2:1.5b"]
+                        self.output.print_info(f"Using current model: {model} (with fallbacks)")
+                    else:
+                        models_to_try = ["llama3.2:1b", "llama3:8b", "llama2", "gemma2:2b", "qwen2:1.5b"]
+                        self.output.print_info("No specific model provided, trying default models")
+                    
+                    for model_name in models_to_try:
                         try:
-                            response = openai_client.chat(messages, model_name, False, 0.3, 30)
-                            if 'choices' in response and len(response['choices']) > 0:
-                                search_query = response['choices'][0]['message']['content'].strip()
-                                # Clean up the response - remove quotes and extra text
+                            self.output.print_info(f"Trying Ollama model: {model_name}")
+                            response = ollama_client.chat(messages, model_name, False, 0.3, 30)
+                            self.output.print_info(f"Ollama response received: {type(response)}")
+                            
+                            if 'message' in response and 'content' in response['message']:
+                                search_query = response['message']['content'].strip()
+                                self.output.print_info(f"Raw AI response: {repr(search_query)}")
+                                
+                                # Check if response is empty
+                                if not search_query or search_query == '':
+                                    self.output.print_info(f"Model {model_name} returned empty response, trying next model...")
+                                    continue
+                                
+                                self.output.print_success(f"AI generated query: '{search_query}'")
+                                
+                                # Clean up the response
                                 import re
                                 search_query = re.sub(r'^["\']|["\']$', '', search_query)
                                 search_query = re.sub(r'(Search query:|Output:)\s*', '', search_query, flags=re.IGNORECASE)
                                 search_query = search_query.strip()
                                 if search_query and len(search_query) > 2:
+                                    self.output.print_success(f"Using AI-generated query: '{search_query[:100]}'")
                                     return search_query[:100]  # Limit length
-                                break
+                                else:
+                                    self.output.print_info(f"Cleaned query too short: {repr(search_query)}, trying next model...")
+                                    continue
+                            break
                         except Exception as model_error:
+                            self.output.print_info(f"Ollama model {model_name} failed: {str(model_error)[:100]}")
                             continue  # Try next model
-                except Exception as e:
-                    self.output.print_info(f"OpenAI query generation failed: {str(e)[:50]}...")
-            
-            # Try Ollama as fallback
-            try:
-                ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
-                if ollama_client.is_available():
-                    # Use a simpler model that's more likely to be available
-                    response = ollama_client.chat(messages, "llama3.2:1b", False, 0.3, 30)
-                    if 'message' in response and 'content' in response['message']:
-                        search_query = response['message']['content'].strip()
-                        # Clean up the response
-                        import re
-                        search_query = re.sub(r'^["\']|["\']$', '', search_query)
-                        search_query = re.sub(r'(Search query:|Output:)\s*', '', search_query, flags=re.IGNORECASE)
-                        search_query = search_query.strip()
-                        if search_query and len(search_query) > 2:
-                            return search_query[:100]  # Limit length
+                            
             except Exception as e:
-                self.output.print_info(f"Ollama query generation failed: {str(e)[:50]}...")
+                self.output.print_info(f"Ollama query generation failed: {str(e)}")
                         
         except Exception as e:
-            # Fallback to simple keyword extraction if AI generation fails
-            pass
+            self.output.print_info(f"AI query generation completely failed: {str(e)}")
+            
+        self.output.print_info("Falling back to manual keyword extraction...")
             
         # Enhanced fallback: Smart keyword extraction with spelling fixes
         import re
         
-        # Common spelling fixes
+        # Common spelling fixes. removed now since it is now useless
         spelling_fixes = {
-            'limux': 'linux',
-            'kernal': 'kernel',
-            'ubunto': 'ubuntu',
-            'phyton': 'python',
-            'pythong': 'python',
-            'javascipt': 'javascript',
-            'programing': 'programming',
-            'developement': 'development',
-            'enviroment': 'environment',
-            'wat': 'what',
-            'wot': 'what',
-            'wen': 'when',
-            'wher': 'where',
-            'artihicial': 'artificial',
-            'artifical': 'artificial',
-            'inteligence': 'intelligence',
-            'intellegince': 'intelligence',
-            'intelligance': 'intelligence',
-            'artifical': 'artificial',
-            'machien': 'machine',
-            'learnig': 'learning',
-            'lerning': 'learning',
-            'algoritm': 'algorithm',
-            'algorith': 'algorithm'
+            
         }
         
         # Apply spelling fixes
@@ -778,7 +844,7 @@ Search query:"""
                     # Generate search query from the question using AI
                     self.output.print_info("Generating search query using AI...")
                     try:
-                        search_query = self._generate_search_query(question, provider)
+                        search_query = self._generate_search_query(question, provider, model)
                         self.output.print_success(f"AI generated query: '{search_query}'")
                         
                         # Show if spelling was corrected
