@@ -8,6 +8,7 @@ This module provides web search capabilities
 import requests
 import json
 import urllib.parse
+import re
 from typing import List, Dict, Optional, Any
 from .output import OutputFormatter
 
@@ -378,6 +379,163 @@ def create_search_prompt_enhancement(query: str, search_results: List[WebSearchR
     
     enhancement += "\n--- End Search Results ---\n\n"
     enhancement += "Please use the above web search results to provide a more comprehensive and up-to-date response to the following query:\n\n"
+    enhancement += query
+    
+    return enhancement
+
+
+class WebsiteContentFetcher:
+    """Fetches and processes content from websites."""
+    
+    def __init__(self, output: Optional[OutputFormatter] = None):
+        self.output = output or OutputFormatter(use_colors=True, render_markdown=False)
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'mdllama/4.1.2 (Content Fetcher Bot)',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'DNT': '1'
+        })
+    
+    def fetch_website_content(self, url: str, max_length: int = 8000) -> Optional[str]:
+        """
+        Fetch and extract readable content from a website.
+        
+        Args:
+            url: The URL to fetch
+            max_length: Maximum length of content to return (default: 8000)
+        
+        Returns:
+            Extracted text content or None if failed
+        """
+        try:
+            # Validate URL
+            if not url.startswith(('http://', 'https://')):
+                url = 'https://' + url
+            
+            self.output.print_info(f"Fetching content from: {url}")
+            
+            # Fetch the webpage
+            response = self.session.get(url, timeout=15)
+            response.raise_for_status()
+            
+            # Check content type
+            content_type = response.headers.get('content-type', '').lower()
+            if 'text/html' not in content_type:
+                self.output.print_error(f"URL does not return HTML content: {content_type}")
+                return None
+            
+            # Extract text content from HTML
+            html_content = response.text
+            text_content = self._extract_text_from_html(html_content)
+            
+            if not text_content.strip():
+                self.output.print_error("No readable text content found on the page")
+                return None
+            
+            # Truncate if too long
+            if len(text_content) > max_length:
+                text_content = text_content[:max_length] + "\n\n[Content truncated due to length limit]"
+            
+            self.output.print_success(f"Successfully fetched {len(text_content)} characters of content")
+            return text_content
+            
+        except requests.exceptions.RequestException as e:
+            self.output.print_error(f"Error fetching website: {e}")
+            return None
+        except Exception as e:
+            self.output.print_error(f"Unexpected error: {e}")
+            return None
+    
+    def _extract_text_from_html(self, html: str) -> str:
+        """
+        Extract readable text content from HTML.
+        
+        This is a simple text extraction that removes HTML tags and scripts.
+        For better extraction, consider using libraries like BeautifulSoup or readability-lxml.
+        """
+        try:
+            # Remove script and style tags and their content
+            html = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.DOTALL | re.IGNORECASE)
+            html = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.DOTALL | re.IGNORECASE)
+            
+            # Remove HTML comments
+            html = re.sub(r'<!--.*?-->', '', html, flags=re.DOTALL)
+            
+            # Remove all HTML tags
+            text = re.sub(r'<[^>]+>', '', html)
+            
+            # Decode HTML entities
+            import html as html_module
+            text = html_module.unescape(text)
+            
+            # Clean up whitespace
+            text = re.sub(r'\n\s*\n', '\n\n', text)  # Multiple newlines to double newlines
+            text = re.sub(r'[ \t]+', ' ', text)      # Multiple spaces to single space
+            text = text.strip()
+            
+            # Remove excessively long lines of repeated characters (likely formatting artifacts)
+            lines = text.split('\n')
+            cleaned_lines = []
+            for line in lines:
+                line = line.strip()
+                if line and not self._is_likely_junk_line(line):
+                    cleaned_lines.append(line)
+            
+            return '\n'.join(cleaned_lines)
+            
+        except Exception as e:
+            self.output.print_error(f"Error extracting text from HTML: {e}")
+            return ""
+    
+    def _is_likely_junk_line(self, line: str) -> bool:
+        """Check if a line is likely junk (navigation, ads, etc.)."""
+        line_lower = line.lower().strip()
+        
+        # Skip very short lines
+        if len(line_lower) < 3:
+            return True
+        
+        # Skip lines that are mostly repeated characters
+        if len(set(line_lower)) < 3:
+            return True
+        
+        # Skip common navigation/UI text
+        junk_patterns = [
+            'click here', 'read more', 'learn more', 'sign up', 'log in', 'login',
+            'subscribe', 'newsletter', 'follow us', 'share this', 'tweet',
+            'facebook', 'twitter', 'instagram', 'linkedin',
+            'advertisement', 'sponsored', 'cookie', 'privacy policy',
+            'terms of service', 'contact us', 'about us', 'home page',
+            'menu', 'navigation', 'search', 'loading'
+        ]
+        
+        for pattern in junk_patterns:
+            if pattern in line_lower and len(line_lower) < 50:
+                return True
+        
+        return False
+
+
+def create_website_prompt_enhancement(query: str, website_content: str, url: str) -> str:
+    """
+    Create an enhanced prompt that includes website content.
+    
+    Args:
+        query: The original user query
+        website_content: Content fetched from the website
+        url: The source URL
+    
+    Returns:
+        Enhanced prompt string
+    """
+    if not website_content:
+        return query
+    
+    enhancement = f"\n\n--- Website Content from {url} ---\n"
+    enhancement += website_content
+    enhancement += f"\n--- End Website Content ---\n\n"
+    enhancement += "Please use the above website content to provide a comprehensive response to the following query:\n\n"
     enhancement += query
     
     return enhancement
