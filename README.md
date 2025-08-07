@@ -8,9 +8,9 @@
 
 [![PPA development (GH Pages)](https://github.com/QinCai-rui/packages/actions/workflows/pages/pages-build-deployment/badge.svg?branch=gh-pages)](https://github.com/QinCai-rui/packages/actions/workflows/pages/pages-build-deployment)
 
-A CLI tool that lets you chat with Ollama models right from your terminal, with built-in Markdown rendering.
+A CLI tool that lets you chat with Ollama and OpenAI models right from your terminal, with built-in Markdown rendering.
 
-mdllama makes it easy to interact with Ollama's AI models directly from your command line, meanwhile providing you with real-time Markdown rendering
+`mdllama` makes it easy to interact with AI models directly from your command line, meanwhile providing you with real-time Markdown rendering.
 
 ## Features
 
@@ -24,7 +24,7 @@ mdllama makes it easy to interact with Ollama's AI models directly from your com
 ![Chat](https://raw.githubusercontent.com/QinCai-rui/mdllama/refs/heads/main/assets/chat.png)
 
 ### Help
-![Help](https://raw.githubusercontent.com/QinCai-rui/mdllama/refs/heads/main/assets/help.png)
+![Help](https://github.com/user-attachments/assets/bb080fe0-9e7b-4ba0-b9c8-f4fe1415082f)
 
 ## Live Demo
 
