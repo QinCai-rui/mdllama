@@ -13,7 +13,7 @@ from .openai_client import OpenAIClient
 from .input_utils import input_with_history, read_multiline_input
 from .session import SessionManager
 from .model_manager import ModelManager
-from .web_search import DuckDuckGoSearch, create_search_prompt_enhancement
+from .web_search import DuckDuckGoSearch, create_search_prompt_enhancement, WebsiteContentFetcher, create_website_prompt_enhancement
 
 try:
     from rich.console import Console
@@ -41,6 +41,7 @@ class LLM_CLI:
         
         # Initialise web search
         self.search_client = DuckDuckGoSearch(self.output)
+        self.website_fetcher = WebsiteContentFetcher(self.output)
         self._pending_search_query = None  # For interactive chat web search enhancement
         
     def setup(self, ollama_host: Optional[str] = None, openai_api_base: Optional[str] = None, provider: str = "ollama"):
@@ -133,6 +134,19 @@ class LLM_CLI:
         """
         self.output.print_info(f"Searching the web for: {query}")
         return self.search_client.search_and_format(query, max_results)
+    
+    def fetch_website_content(self, url: str, max_length: int = 8000) -> Optional[str]:
+        """
+        Fetch content from a website and return as text.
+        
+        Args:
+            url: The website URL to fetch
+            max_length: Maximum length of content to return (default: 8000)
+        
+        Returns:
+            Website content as text or None if failed
+        """
+        return self.website_fetcher.fetch_website_content(url, max_length)
     
     def _generate_search_query(self, question: str, provider: str = "openai", model: Optional[str] = None) -> str:
         """
@@ -393,7 +407,8 @@ Respond with ONLY the optimized search query, nothing else:"""
                  provider: Optional[str] = None,
                  openai_api_base: Optional[str] = None,
                  web_search_query: Optional[str] = None,
-                 max_search_results: int = 3) -> Optional[str]:
+                 max_search_results: int = 3,
+                 website_url: Optional[str] = None) -> Optional[str]:
         """Generate a completion using the configured provider."""
         
         # Process file attachments
@@ -408,6 +423,15 @@ Respond with ONLY the optimized search query, nothing else:"""
                 self.output.print_success(f"Enhanced prompt with {len(search_results)} web search results")
             else:
                 self.output.print_info("No web search results found")
+        
+        # Enhance prompt with website content if requested
+        if website_url:
+            website_content = self.fetch_website_content(website_url)
+            if website_content:
+                prompt = create_website_prompt_enhancement(prompt, website_content, website_url)
+                self.output.print_success(f"Enhanced prompt with website content from {website_url}")
+            else:
+                self.output.print_info(f"Failed to fetch content from {website_url}")
         
         # Prepare messages
         messages = self._prepare_messages(prompt, system_prompt)
@@ -691,6 +715,7 @@ Respond with ONLY the optimized search query, nothing else:"""
         self.output.print_command("searchask:<query>|<question> - Search and immediately ask about results")
         self.output.print_command("searchask:<query> - Search and ask for summary")
         self.output.print_command("websearch:<question> - AI-powered search: auto-generate query and answer")
+        self.output.print_command("site:<url>       - Fetch website content and add to context")
         self.output.print_command("models           - Show available models with numbers")
         self.output.print_command('"""              - Start/end a multiline message')
         self.output.print_info("Keyboard shortcuts:")
@@ -870,6 +895,38 @@ Respond with ONLY the optimized search query, nothing else:"""
                 else:
                     self.output.print_error("Please specify a question after websearch:")
                     continue
+            elif user_input.startswith('site:'):
+                url = user_input[5:].strip()
+                if url:
+                    # Fetch website content
+                    website_content = self.fetch_website_content(url)
+                    if website_content:
+                        # Add website content to conversation context as a system message
+                        site_context = f"Website content from '{url}':\n\n{website_content}"
+                        self.session_manager.current_context.append({
+                            "role": "system", 
+                            "content": site_context
+                        })
+                        self.output.print_success(f"Website content from '{url}' added to conversation context.")
+                        
+                        # Show a preview
+                        preview_length = 200
+                        preview = website_content[:preview_length]
+                        if len(website_content) > preview_length:
+                            preview += "..."
+                        
+                        if self.use_colors:
+                            print(f"{Colors.BRIGHT_BLACK}Preview: {preview}{Colors.RESET}")
+                        else:
+                            print(f"Preview: {preview}")
+                        print()
+                        
+                        self.output.print_success("You can now ask questions about the website content.")
+                    else:
+                        self.output.print_error("Failed to fetch website content.")
+                else:
+                    self.output.print_error("Please specify a website URL after site:")
+                continue
             elif user_input.strip() == '"""':
                 user_input = read_multiline_input()
                 self.output.print_success("Multiline input received")
