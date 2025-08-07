@@ -13,6 +13,7 @@ from .openai_client import OpenAIClient
 from .input_utils import input_with_history, read_multiline_input
 from .session import SessionManager
 from .model_manager import ModelManager
+from .web_search import DuckDuckGoSearch, create_search_prompt_enhancement
 
 try:
     from rich.console import Console
@@ -37,6 +38,10 @@ class LLM_CLI:
         # Initialize clients
         self.ollama_client = None
         self.openai_client = None
+        
+        # Initialise web search
+        self.search_client = DuckDuckGoSearch(self.output)
+        self._pending_search_query = None  # For interactive chat web search enhancement
         
     def setup(self, ollama_host: Optional[str] = None, openai_api_base: Optional[str] = None, provider: str = "ollama"):
         """Set up the CLI with Ollama or OpenAI-compatible configuration."""
@@ -114,6 +119,20 @@ class LLM_CLI:
     def show_model_chooser(self, provider: str = "ollama") -> Optional[str]:
         """Show a numbered list of available models and allow user to choose."""
         return self.model_manager.show_model_chooser(provider)
+    
+    def web_search(self, query: str, max_results: int = 5) -> str:
+        """
+        Perform a web search using DuckDuckGo and return formatted results.
+        
+        Args:
+            query: The search query
+            max_results: Maximum number of results to return (default: 5)
+        
+        Returns:
+            Formatted search results
+        """
+        self.output.print_info(f"Searching the web for: {query}")
+        return self.search_client.search_and_format(query, max_results)
             
     def _prepare_messages(self, prompt: str, system_prompt: Optional[str] = None) -> List[Dict[str, Any]]:
         """Prepare messages for completion, including context."""
@@ -159,11 +178,23 @@ class LLM_CLI:
                  keep_context: bool = True,
                  save_history: bool = False,
                  provider: Optional[str] = None,
-                 openai_api_base: Optional[str] = None) -> Optional[str]:
+                 openai_api_base: Optional[str] = None,
+                 web_search_query: Optional[str] = None,
+                 max_search_results: int = 3) -> Optional[str]:
         """Generate a completion using the configured provider."""
         
         # Process file attachments
         prompt = self._process_file_attachments(prompt, file_paths)
+        
+        # Enhance prompt with web search results if requested
+        if web_search_query:
+            self.output.print_info(f"Searching the web for: {web_search_query}")
+            search_results = self.search_client.search(web_search_query, max_search_results)
+            if search_results:
+                prompt = create_search_prompt_enhancement(prompt, search_results)
+                self.output.print_success(f"Enhanced prompt with {len(search_results)} web search results")
+            else:
+                self.output.print_info("No web search results found")
         
         # Prepare messages
         messages = self._prepare_messages(prompt, system_prompt)
@@ -437,17 +468,21 @@ class LLM_CLI:
             
         # Print help
         self.output.print_info("Interactive chat commands:")
-        self.output.print_command("exit/quit      - Exit the chat session")
-        self.output.print_command("clear          - Clear the conversation context")
-        self.output.print_command("file:<path>    - Include a file in your next message (max 2MB)")
-        self.output.print_command("system:<prompt>- Set or change the system prompt")
-        self.output.print_command("temp:<value>   - Change the temperature setting")
-        self.output.print_command("model:<name>   - Switch to a different model")
-        self.output.print_command("models         - Show available models with numbers")
-        self.output.print_command('"""           - Start/end a multiline message')
+        self.output.print_command("exit/quit        - Exit the chat session")
+        self.output.print_command("clear            - Clear the conversation context")
+        self.output.print_command("file:<path>      - Include a file in your next message (max 2MB)")
+        self.output.print_command("system:<prompt>  - Set or change the system prompt")
+        self.output.print_command("temp:<value>     - Change the temperature setting")
+        self.output.print_command("model:<name>     - Switch to a different model")
+        self.output.print_command("search:<query>   - Search the web and add results to context")
+        self.output.print_command("searchask:<query>|<question> - Search and immediately ask about results")
+        self.output.print_command("searchask:<query> - Search and ask for summary")
+        self.output.print_command("websearch:<query>- Enhance next prompt with web search results")
+        self.output.print_command("models           - Show available models with numbers")
+        self.output.print_command('"""              - Start/end a multiline message')
         self.output.print_info("Keyboard shortcuts:")
-        self.output.print_command("Ctrl+C         - Interrupt model response (not for exiting)")
-        self.output.print_command("Ctrl+D         - Exit the chat session")
+        self.output.print_command("Ctrl+C           - Interrupt model response (not for exiting)")
+        self.output.print_command("Ctrl+D           - Exit the chat session")
         print()
         
         # Add system prompt if provided
@@ -536,6 +571,69 @@ class LLM_CLI:
                 else:
                     self.output.print_error("Please specify a model name.")
                 continue
+            elif user_input.startswith('search:'):
+                search_query = user_input[7:].strip()
+                if search_query:
+                    search_results_text = self.web_search(search_query)
+                    print(search_results_text)
+                    print()
+                    
+                    # Add search results to conversation context as a system message
+                    search_context = f"Web search results for '{search_query}':\n{search_results_text}"
+                    self.session_manager.current_context.append({
+                        "role": "system", 
+                        "content": search_context
+                    })
+                    self.output.print_success(f"Search results added to conversation context. You can now ask questions about the search results.")
+                else:
+                    self.output.print_error("Please specify a search query.")
+                continue
+            elif user_input.startswith('searchask:'):
+                # Format: searchask:query|question
+                # e.g., "searchask:Python 3.13|What are the new features?"
+                parts = user_input[10:].strip().split('|', 1)
+                if len(parts) == 2:
+                    search_query, question = parts[0].strip(), parts[1].strip()
+                    
+                    # Perform search and add to context
+                    search_results_text = self.web_search(search_query)
+                    search_context = f"Web search results for '{search_query}':\n{search_results_text}"
+                    self.session_manager.current_context.append({
+                        "role": "system", 
+                        "content": search_context
+                    })
+                    
+                    # Now ask the question - this will be processed as a regular prompt
+                    user_input = question
+                    self.output.print_success(f"Search completed for '{search_query}'. Now asking: {question}")
+                    print()
+                    # Don't continue here - let it fall through to process the question
+                elif len(parts) == 1 and parts[0]:
+                    # Just search query, ask a default question
+                    search_query = parts[0].strip()
+                    search_results_text = self.web_search(search_query)
+                    search_context = f"Web search results for '{search_query}':\n{search_results_text}"
+                    self.session_manager.current_context.append({
+                        "role": "system", 
+                        "content": search_context
+                    })
+                    
+                    user_input = f"Based on the search results above, please summarize the key information about {search_query}."
+                    self.output.print_success(f"Search completed for '{search_query}'. Asking for summary.")
+                    print()
+                    # Don't continue here - let it fall through to process the question
+                else:
+                    self.output.print_error("Please specify a search query. Format: searchask:query|question or searchask:query")
+                    continue
+            elif user_input.startswith('websearch:'):
+                search_query = user_input[10:].strip()
+                if search_query:
+                    # Store search query for next prompt enhancement
+                    self._pending_search_query = search_query
+                    self.output.print_success(f"Next prompt will be enhanced with web search results for: {search_query}")
+                else:
+                    self.output.print_error("Please specify a search query.")
+                continue
             elif user_input.strip() == '"""':
                 user_input = read_multiline_input()
                 self.output.print_success("Multiline input received")
@@ -552,6 +650,10 @@ class LLM_CLI:
             # Use streaming if requested, with fallback for OpenAI compatibility issues
             use_streaming = stream
             try:
+                # Check if we have a pending web search query
+                search_query = self._pending_search_query
+                self._pending_search_query = None  # Clear after use
+                
                 self.complete(
                     prompt=user_input,
                     model=model,
@@ -560,7 +662,9 @@ class LLM_CLI:
                     max_tokens=max_tokens,
                     keep_context=True,
                     save_history=False,
-                    provider=provider
+                    provider=provider,
+                    web_search_query=search_query,
+                    max_search_results=3
                 )
             except KeyboardInterrupt:
                 # CTRL-C interrupts the current response but continues the chat
