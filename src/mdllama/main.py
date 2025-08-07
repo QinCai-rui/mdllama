@@ -107,7 +107,7 @@ def main():
         use_colors = False
 
     # Initialize CLI
-    # Enable markdown rendering by default wHEN Rich is available, UNLESS explicitly disabled
+    # Enable markdown rendering by default WHEN Rich is available, UNLESS explicitly disabled
     render_markdown = True
     if hasattr(args, 'render_markdown'):
         render_markdown = args.render_markdown
