@@ -18,10 +18,32 @@ A CLI tool that lets you chat with Ollama and OpenAI models right from your term
 
 - **Multi-provider support**: Chat with both Ollama and OpenAI-compatible models from the terminal
 - **Built-in Markdown rendering**: Rich text display with proper formatting
-- **Interactive chat sessions**: Full conversation management with context preservation
-- **Streaming responses**: Real-time response generation for better user experience
+- **Interactive chat sessions**: Full conversation management with context
+- **Streaming responses**: Real-time response generation
 
-TODO
+### Web Integration/access
+
+- **Web search**: Search the web using DuckDuckGo directly from chat
+- **Smart search queries**: AI-powered search query optimization with spelling correction
+- **Website content fetching**: Extract and include content from any website in your conversations
+- **Multiple search modes**:
+  - `search:query` - Basic web search with results added to context
+  - `searchask:query|question` - Search and ask a specific question about results
+  - `websearch:question` - AI-generated search with automatic query optimization
+  - `site:url` - Fetch content from a specific website
+
+### Session Management
+
+- **Conversation history**: Save and restore chat sessions with timestamps
+- **Sessions**: Continue conversations across sessions
+- **Context**: Clear context, load previous sessions, and manage conversation flow
+- **Multiple session support**: Switch between different conversations
+
+### File Integration
+
+- **Local file support**: Include files from your filesystem in conversations (up to 2MB per file)
+- **Multiple file formats**: Support for text files, code, documentation, and more
+- **Context-aware processing**: Files are integrated into conversation context
 
 ## Screenshots
 
