@@ -14,26 +14,115 @@ A CLI tool that lets you chat with Ollama and OpenAI models right from your term
 
 ## Features
 
-- Chat with Ollama models from the terminal
-- Built-in Markdown rendering
-- Simple installation and removal (see below)
+### Core Functionality
+
+- **Multi-provider support**: Chat with both Ollama and OpenAI-compatible models from the terminal
+- **Built-in Markdown rendering**: Rich text display with proper formatting
+- **Interactive chat sessions**: Full conversation management with context preservation
+- **Streaming responses**: Real-time response generation for better user experience
+
+TODO
 
 ## Screenshots
 
 ### Chat Interface
+
 ![Chat](https://raw.githubusercontent.com/QinCai-rui/mdllama/refs/heads/main/assets/chat.png)
 
 ### Help
+
 ![Help](https://github.com/user-attachments/assets/bb080fe0-9e7b-4ba0-b9c8-f4fe1415082f)
+
+## Interactive Commands
+
+When using `mdllama run` for interactive chat, you have access to special commands:
+
+### Basic Commands
+
+- `exit` or `quit` - End the interactive session
+- `clear` - Clear the current conversation context
+- `models` - Show numbered list of available models for selection
+- `"""` - Start/end multiline input mode for longer messages
+
+### File and Content Integration
+
+- `file:path/to/file` - Include local file content in your next message
+- `site:url` - Fetch and include website content in conversation context
+- `system:prompt` - Set or change the system prompt (use without prompt to clear)
+
+### Web Search Commands
+
+- `search:query` - Search the web and add results to conversation context
+- `searchask:query|question` - Search for specific query and ask a question about results
+- `websearch:question` - Let AI generate optimized search query and get results
+
+### Runtime Controls
+
+- `temp:value` - Change temperature setting (0.0 to 1.0)
+- `model:name` - Switch to different model (or show list if name omitted)
+
+### Command Line Options
+
+- `mdllama search "query"` - Standalone web search command
+- `mdllama sessions` - List all saved conversation sessions
+- `mdllama load-session session_id` - Load a previous conversation
+- `mdllama clear-context` - Clear current conversation context
+- `mdllama models` - List available models
+- `mdllama pull model_name` - Download a model from Ollama registry
+
+## OpenAI and Provider Support
+
+### Supported Providers
+
+- **Ollama**: Local models running on your machine
+- **OpenAI**: Official OpenAI API (GPT-3.5, GPT-4, etc.)
+- **OpenAI-compatible**: Any API that follows OpenAI's format (Hackclub AI, LocalAI, etc.)
+
+### Setup Instructions
+
+#### For Ollama (Default)
+```bash
+mdllama setup
+# Or specify explicitly
+mdllama setup --provider ollama
+```
+
+#### For OpenAI
+```bash
+mdllama setup --provider openai
+# Will prompt for your OpenAI API key
+```
+
+#### For OpenAI-Compatible APIs
+```bash
+mdllama setup --provider openai --openai-api-base https://ai.hackclub.com
+# Then provide your API key when prompted
+```
+
+### Usage Examples
+
+```bash
+# Use with OpenAI
+mdllama chat --provider openai "Explain quantum computing"
+
+# Use with specific model and provider
+mdllama run --provider openai --model gpt-4
+
+# Interactive session with streaming
+mdllama run --provider openai --stream --render-markdown
+```
 
 ## Live Demo
 
 Go to this [mdllama demo](https://mdllama-demo.qincai.xyz) to try it out live in your browser. The API key is `9c334d5a0863984b641b1375a850fb5d`
 
 > [!NOTE]
-> Try asking the model to give you some markdown-formatted text, like:
+> Try asking the model to give you some markdown-formatted text, or test the web search features:
 >
-> `Give me a markdown-formatted text about the history of AI.`
+> - `Give me a markdown-formatted text about the history of AI.`
+> - `search:Python 3.13` (web search)
+> - `site:python.org` (fetch website content)
+> - `websearch:What are the latest Python features?` (AI-powered search)
 
 So try it out and see how it works!
 
@@ -99,9 +188,17 @@ So try it out and see how it works!
    ```
 
    > [!NOTE]
-   > The `ollama` library is not installed by default in the RPM package since there is no system `ollama` package avaliable (`python3-ollama`). You need to install it manually using pip in order to use `mdllama` with Ollama models.
+   > ~~The `ollama` library is not installed by default in the RPM package since there is no system `ollama` package avaliable (`python3-ollama`). You need to install it manually using pip in order to use `mdllama` with Ollama models.~~This issue has been resolved by including a post-installation script for RPM packages that automatically installs the `ollama` library using pip.
 
 ---
+
+### PyPI Installation (Cross-Platform)
+
+Install via pip (recommended for Windows/macOS and Python virtual environments):
+
+```bash
+pip install mdllama
+```
 
 ### Traditional Bash Script Installation (Linux)
 
@@ -115,16 +212,6 @@ To uninstall **mdllama**, run:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/QinCai-rui/mdllama/refs/heads/main/uninstall.sh)
-```
-
----
-
-### Windows & macOS Installation
-
-Install via pip (recommended for Windows/macOS):
-
-```bash
-pip install mdllama
 ```
 
 ## License
