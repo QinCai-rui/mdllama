@@ -18,8 +18,8 @@ A CLI tool that lets you chat with Ollama and OpenAI models right from your term
 
 - **Multi-provider support**: Chat with both Ollama and OpenAI-compatible models from the terminal
 - **Built-in Markdown rendering**: Rich text display with proper formatting
-- **Interactive chat sessions**: Full conversation management with context preservation
-- **Streaming responses**: Real-time response generation for better user experience
+- **Interactive chat sessions**: Full conversation management with context
+- **Streaming responses**: Real-time response generation
 
 TODO
 
