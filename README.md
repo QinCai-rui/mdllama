@@ -188,7 +188,7 @@ So try it out and see how it works!
    ```
 
    > [!NOTE]
-   > ~~The `ollama` library is not installed by default in the RPM package since there is no system `ollama` package avaliable (`python3-ollama`). You need to install it manually using pip in order to use `mdllama` with Ollama models.~~This issue has been resolved by including a post-installation script for RPM packages that automatically installs the `ollama` library using pip.
+   > ~~The `ollama` library is not installed by default in the RPM package since there is no system `ollama` package avaliable (`python3-ollama`). You need to install it manually using pip in order to use `mdllama` with Ollama models.~~ This issue has been resolved by including a post-installation script for RPM packages that automatically installs the `ollama` library using pip.
 
 ---
 
