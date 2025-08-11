@@ -43,7 +43,9 @@ A CLI tool that lets you chat with Ollama and OpenAI models right from your term
 
 - **Local file support**: Include files from your filesystem in conversations (up to 2MB per file)
 - **Multiple file formats**: Support for text files, code, documentation, and more
-- **Context-aware processing**: Files are integrated into conversation context
+- **Context-aware processing**: Files are integrated into conversation contexxt
+
+TODO--------------------------------------------------------------|
 
 ## Screenshots
 
