@@ -1,5 +1,5 @@
 .
-.TH MDLLAMA 1 "July 2025" "mdllama 3.3.x" "User Commands"
+.TH MDLLAMA 1 "August 2025" "mdllama 4.2.x" "User Commands"
 .SH NAME
 mdllama \- command-line interface for large language models via Ollama and OpenAI-compatible endpoints
 .SH SYNOPSIS
@@ -16,7 +16,7 @@ mdllama \- command-line interface for large language models via Ollama and OpenA
 .B mdllama
 is a command-line interface for interacting with large language models (LLMs) through Ollama and OpenAI-compatible API endpoints. It provides both single-shot chat completions and interactive chat sessions, along with comprehensive model management capabilities.
 .PP
-The tool supports streaming responses, file attachments as context, conversation history management, and rich Markdown rendering. It can be configured to work with multiple providers and maintains session history for persistent conversations.
+The tool supports streaming responses, file attachments as context, conversation history management, rich Markdown rendering, and web search integration. It can be configured to work with multiple providers and maintains session history for persistent conversations.
 .PP
 .B Key Features:
 .IP \(bu 2
@@ -36,7 +36,11 @@ Streaming responses with real-time output
 .IP \(bu 2
 Rich Markdown rendering and syntax highlighting
 .IP \(bu 2
-Customizable system prompts and parameters
+Web search and website content integration
+.IP \(bu 2
+AI-powered search query optimisation
+.IP \(bu 2
+Customisable system prompts and parameters
 .IP \(bu 2
 Colored terminal output with fallback support
 .SH OPTIONS
@@ -60,6 +64,18 @@ Set the base URL for OpenAI-compatible API endpoints (e.g., https://ai.hackclub.
 .TP
 .B check-release
 Check for new stable and pre-release versions of mdllama from the GitHub repository.
+.SS "Web Search"
+.TP
+.BI search " " QUERY
+Search the web using DuckDuckGo.
+.RS
+.TP
+.BR \-n ", " \-\-max\-results " " \fINUM\fR
+Maximum number of results to return (default: 5, max: 10).
+.TP
+.B \-\-no\-color
+Disable colored output.
+.RE
 .SS "Configuration"
 .TP
 .BI setup " " [ OPTIONS ]
@@ -141,6 +157,12 @@ Enable rich Markdown rendering (requires python-rich).
 .TP
 .BI \-\-prompt\-file " " FILE
 Read prompt from specified file.
+.TP
+.BI \-\-web\-search " " QUERY
+Enhance prompt with web search results for the specified query.
+.TP
+.BI \-\-max\-search\-results " " NUM
+Maximum number of web search results to include (default: 3).
 .RE
 .TP
 .BI run " " [ OPTIONS ]
@@ -213,6 +235,22 @@ is omitted, displays a numbered list of available models for selection.
 .B models
 Show a numbered list of available models from the current provider. Enter the number corresponding to your desired model to switch to it.
 .TP
+.BI search: query
+Search the web using DuckDuckGo and add results to conversation context.
+.TP
+.BI searchask: query | question
+Search the web for
+.I query
+and immediately ask the specified
+.I question
+about the results. If only query is provided, asks for a summary.
+.TP
+.BI websearch: question
+AI-powered search that automatically generates an optimised search query from your question and answers it using web results.
+.TP
+.BI site: url
+Fetch content from the specified website URL and add it to conversation context.
+.TP
 .B """""""
 Start or end multiline input mode for composing longer messages.
 .SH ENVIRONMENT
@@ -224,7 +262,7 @@ GitHub personal access token for higher API rate limits when checking releases.
 When set to any value, disables colored output globally.
 .SH FILES
 .TP
-.B ~/.mdllama/config.yaml
+.B ~/.mdllama/config.json
 Primary configuration file containing provider settings, API keys, and default options.
 .TP
 .B ~/.mdllama/history/
@@ -237,8 +275,14 @@ Generate a simple chat completion.
 .B mdllama chat --model llama3 --stream --render-markdown "Write a README"
 Stream a response with Markdown rendering using a specific model.
 .TP
-.B mdllama chat --file document.txt --system "You are a helpful assistant" "Summarize this"
+.B mdllama chat --file document.txt --system "You are a helpful assistant" "Summarise this"
 Include a file as context with a custom system prompt.
+.TP
+.B mdllama chat --web-search "Python 3.13 features" "What are the new features?"
+Generate a chat completion with web search results included as context.
+.TP
+.B mdllama search "Python machine learning libraries"
+Search the web and display results directly.
 .TP
 .B mdllama run --model gemma3:1b --save
 Start an interactive session that saves conversation history.
@@ -286,7 +330,7 @@ When starting an interactive session without specifying a model, a numbered list
 .TP
 .B Configuration Issues
 Check
-.B ~/.mdllama/config.yaml
+.B ~/.mdllama/config.json
 for syntax errors or incorrect settings. Use
 .B mdllama setup
 to reconfigure.
@@ -297,10 +341,13 @@ If colors are not displaying correctly, use
 or set the
 .B NO_COLOR
 environment variable.
+.TP
+.B Web Search Issues
+If web search fails, check your internet connection. Web search uses DuckDuckGo and requires network access. The AI-powered search query generation will fall back to simple keyword extraction if AI models are unavailable.
 .SS "Performance Tips"
 .TP
 .B Large Files
-When attaching files, ensure they are under 2MB. For larger documents, consider splitting them or using file summarization first.
+When attaching files, ensure they are under 2MB. For larger documents, consider splitting them or using file summarisation first.
 .TP
 .B Streaming
 Use
@@ -311,6 +358,9 @@ for real-time response output, especially useful for longer responses. For OpenA
 Set
 .B GITHUB_TOKEN
 for higher GitHub API rate limits when checking releases frequently.
+.TP
+.B Web Search Performance
+Use specific search queries for better results. The AI-powered search query optimisation can help improve search effectiveness by correcting spelling and optimizing search terms.
 .SH SEE ALSO
 .TP
 .B mdllama project page:
@@ -334,7 +384,7 @@ is developed by QinCai-rui (Raymont Qin) and contributors.
 .PP
 This manual page was written for the mdllama project.
 .SH COPYRIGHT
-Copyright \(co 2025 QinCai-rui and contributors.
+Copyright \(co 2025 QinCai-rui (Raymont Qin) and contributors.
 .br
 License: GNU General Public License v3.0
 .br
