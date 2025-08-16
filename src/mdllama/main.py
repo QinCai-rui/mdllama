@@ -43,7 +43,7 @@ def main():
     chat_parser = subparsers.add_parser("chat", help="Generate a chat completion")
     chat_parser.add_argument("prompt", help="The prompt to send to the API", nargs="?")
     chat_parser.add_argument("--model", "-m", default="gemma3:1b", help="Model to use for completion")
-    chat_parser.add_argument("--stream", "-s", action="store_true", help="Stream the response")
+    chat_parser.add_argument("--stream", "-s", type=lambda x: x.lower() not in ['false', 'f', '0', 'no'], default=True, help="Stream the response (default: true, use --stream=false to disable)")
     chat_parser.add_argument("--system", help="System prompt to use")
     chat_parser.add_argument("--temperature", "-t", type=float, default=0.7, help="Temperature for sampling")
     chat_parser.add_argument("--max-tokens", type=int, help="Maximum number of tokens to generate")
@@ -51,7 +51,7 @@ def main():
     chat_parser.add_argument("--context", "-c", action="store_true", help="Keep conversation context")
     chat_parser.add_argument("--save", action="store_true", help="Save conversation history")
     chat_parser.add_argument("--no-color", action="store_true", help="Disable colored output")
-    chat_parser.add_argument("--render-markdown", "-r", action="store_true", help="Render markdown in the response")
+    chat_parser.add_argument("--render-markdown", "-r", type=lambda x: x.lower() not in ['false', 'f', '0', 'no'], default=True, help="Render markdown in the response (default: true, use --render-markdown=false to disable)")
     chat_parser.add_argument("-p", "--provider", choices=["ollama", "openai"], default=None, help="Provider to use: ollama or openai (default: ollama)")
     chat_parser.add_argument("--openai-api-base", help=argparse.SUPPRESS)
     chat_parser.add_argument("--prompt-file", help="Path to file containing the prompt")
@@ -65,9 +65,9 @@ def main():
     interactive_parser.add_argument("--temperature", "-t", type=float, default=0.7, help="Temperature for sampling")
     interactive_parser.add_argument("--max-tokens", type=int, help="Maximum number of tokens to generate")
     interactive_parser.add_argument("--save", action="store_true", help="Save conversation history")
-    interactive_parser.add_argument("--stream", action="store_true", help="Enable streaming responses")
+    interactive_parser.add_argument("--stream", type=lambda x: x.lower() not in ['false', 'f', '0', 'no'], default=True, help="Enable streaming responses (default: true, use --stream=false to disable)")
     interactive_parser.add_argument("--no-color", action="store_true", help="Disable colored output")
-    interactive_parser.add_argument("--render-markdown", "-r", action="store_true", help="Render markdown in the response")
+    interactive_parser.add_argument("--render-markdown", "-r", type=lambda x: x.lower() not in ['false', 'f', '0', 'no'], default=True, help="Render markdown in the response (default: true, use --render-markdown=false to disable)")
     interactive_parser.add_argument("-p", "--provider", choices=["ollama", "openai"], default=None, help="Provider to use: ollama or openai (default: ollama)")
     interactive_parser.add_argument("--openai-api-base", help=argparse.SUPPRESS)
 
@@ -106,7 +106,7 @@ def main():
         use_colors = False
 
     # Initialize CLI
-    # Enable markdown rendering by default WHEN Rich is available, UNLESS explicitly disabled
+    # Enable markdown rendering by default, UNLESS explicitly disabled
     render_markdown = True
     if hasattr(args, 'render_markdown'):
         render_markdown = args.render_markdown
