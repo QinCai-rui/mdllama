@@ -198,7 +198,7 @@ Output: artificial intelligence
 
 Now convert: "{question}"
 
-Respond with ONLY the optimized search query, nothing else:"""
+Respond with ONLY the optimized search query, nothing else (not even <think>):"""
 
         # Normalize provider name to lowercase
         provider = provider.lower()
@@ -207,120 +207,135 @@ Respond with ONLY the optimized search query, nothing else:"""
             # Create a simple message for the AI
             messages = [{"role": "user", "content": search_prompt}]
             
-            self.output.print_info(f"Attempting to use {provider} for search query generation...")
-            
             # Try to use the configured provider to generate the search query
             if provider == "openai":
                 api_base = self.config.get('openai_api_base')
-                self.output.print_info(f"OpenAI API base: {api_base}")
                 
                 if api_base:
                     try:
                         openai_client = OpenAIClient(api_base, self.config)
-                        self.output.print_info("OpenAI client created, testing connection...")
                         
                         # Use provided model or try different models in order of preference
                         if model:
                             models_to_try = [model, "llama3-8b-8192", "mixtral-8x7b-32768", "gpt-4o-mini", "gpt-3.5-turbo"]
-                            self.output.print_info(f"Using current model: {model} (with fallbacks)")
                         else:
                             models_to_try = ["llama3-8b-8192", "mixtral-8x7b-32768", "gpt-4o-mini", "gpt-3.5-turbo", "gpt-4", "gpt-4o"]
-                            self.output.print_info("No specific model provided, trying default models")
                         
                         for model_name in models_to_try:
                             try:
-                                self.output.print_info(f"Trying OpenAI model: {model_name}")
                                 response = openai_client.chat(messages, model_name, False, 0.3, 30)
-                                self.output.print_info(f"OpenAI response received: {type(response)}")
                                 
                                 if 'choices' in response and len(response['choices']) > 0:
                                     choice = response['choices'][0]
                                     search_query = choice['message']['content'].strip()
-                                    self.output.print_info(f"Raw AI response: {repr(search_query)}")
                                     
                                     # Check if response is empty
                                     if not search_query or search_query == '':
-                                        self.output.print_info(f"Model {model_name} returned empty response, trying next model...")
                                         continue
-                                    
-                                    self.output.print_success(f"AI generated query: '{search_query}'")
                                     
                                     # Clean up the response - remove quotes and extra text
                                     import re
                                     search_query = re.sub(r'^["\']|["\']$', '', search_query)
                                     search_query = re.sub(r'(Search query:|Output:)\s*', '', search_query, flags=re.IGNORECASE)
+                                    
+                                    # Handle "thinking" model responses - extract actual query from <think> blocks
+                                    if '<think>' in search_query or '<thinking>' in search_query:
+                                        # Try to extract content after thinking blocks
+                                        think_patterns = [
+                                            r'</think>\s*(.+?)(?:\n|$)',
+                                            r'</thinking>\s*(.+?)(?:\n|$)',
+                                            r'<think>.*?</think>\s*(.+?)(?:\n|$)',
+                                            r'<thinking>.*?</thinking>\s*(.+?)(?:\n|$)'
+                                        ]
+                                        
+                                        for pattern in think_patterns:
+                                            match = re.search(pattern, search_query, re.DOTALL | re.IGNORECASE)
+                                            if match:
+                                                extracted = match.group(1).strip()
+                                                if extracted and len(extracted) > 2:
+                                                    search_query = extracted
+                                                    break
+                                        else:
+                                            # If no extraction worked, fall back to simple keyword extraction
+                                            words = re.findall(r'\b\w+\b', question.lower())
+                                            filtered_words = [word for word in words if word not in ['what', 'is', 'the', 'how', 'do', 'does'] and len(word) > 2]
+                                            search_query = ' '.join(filtered_words[:5]) or question.strip()
+                                    
                                     search_query = search_query.strip()
                                     if search_query and len(search_query) > 2:
-                                        self.output.print_success(f"Using AI-generated query: '{search_query[:100]}'")
                                         return search_query[:100]  # Limit length
                                     else:
-                                        self.output.print_info(f"Cleaned query too short: {repr(search_query)}, trying next model...")
                                         continue
                                 break
-                            except Exception as model_error:
-                                self.output.print_info(f"Model {model_name} failed: {str(model_error)[:100]}")
+                            except Exception:
                                 continue  # Try next model
-                    except Exception as e:
-                        self.output.print_info(f"OpenAI query generation failed: {str(e)}")
-                else:
-                    self.output.print_info("No OpenAI API base configured")
+                    except Exception:
+                        pass  # Fall through to Ollama
             
             # Try Ollama as fallback or primary choice
-            self.output.print_info("Trying Ollama for search query generation...")
             try:
                 ollama_client = OllamaClient(self.config.get('ollama_host', OLLAMA_DEFAULT_HOST))
                 is_available = ollama_client.is_available()
-                self.output.print_info(f"Ollama available: {is_available}")
                 
                 if is_available:
                     # Use provided model or try multiple models in order of preference
                     if model:
                         models_to_try = [model, "llama3.2:1b", "llama3:8b", "llama2", "gemma2:2b", "qwen2:1.5b"]
-                        self.output.print_info(f"Using current model: {model} (with fallbacks)")
                     else:
                         models_to_try = ["llama3.2:1b", "llama3:8b", "llama2", "gemma2:2b", "qwen2:1.5b"]
-                        self.output.print_info("No specific model provided, trying default models")
                     
                     for model_name in models_to_try:
                         try:
-                            self.output.print_info(f"Trying Ollama model: {model_name}")
                             response = ollama_client.chat(messages, model_name, False, 0.3, 30)
-                            self.output.print_info(f"Ollama response received: {type(response)}")
                             
                             if 'message' in response and 'content' in response['message']:
                                 search_query = response['message']['content'].strip()
-                                self.output.print_info(f"Raw AI response: {repr(search_query)}")
                                 
                                 # Check if response is empty
                                 if not search_query or search_query == '':
-                                    self.output.print_info(f"Model {model_name} returned empty response, trying next model...")
                                     continue
-                                
-                                self.output.print_success(f"AI generated query: '{search_query}'")
                                 
                                 # Clean up the response
                                 import re
                                 search_query = re.sub(r'^["\']|["\']$', '', search_query)
                                 search_query = re.sub(r'(Search query:|Output:)\s*', '', search_query, flags=re.IGNORECASE)
+                                
+                                # Handle "thinking" model responses
+                                if '<think>' in search_query or '<thinking>' in search_query:
+                                    think_patterns = [
+                                        r'</think>\s*(.+?)(?:\n|$)',
+                                        r'</thinking>\s*(.+?)(?:\n|$)',
+                                        r'<think>.*?</think>\s*(.+?)(?:\n|$)',
+                                        r'<thinking>.*?</thinking>\s*(.+?)(?:\n|$)'
+                                    ]
+                                    
+                                    for pattern in think_patterns:
+                                        match = re.search(pattern, search_query, re.DOTALL | re.IGNORECASE)
+                                        if match:
+                                            extracted = match.group(1).strip()
+                                            if extracted and len(extracted) > 2:
+                                                search_query = extracted
+                                                break
+                                    else:
+                                        # If no extraction worked, fall back to simple keyword extraction
+                                        words = re.findall(r'\b\w+\b', question.lower())
+                                        filtered_words = [word for word in words if word not in ['what', 'is', 'the', 'how', 'do', 'does'] and len(word) > 2]
+                                        search_query = ' '.join(filtered_words[:5]) or question.strip()
+                                
                                 search_query = search_query.strip()
                                 if search_query and len(search_query) > 2:
-                                    self.output.print_success(f"Using AI-generated query: '{search_query[:100]}'")
                                     return search_query[:100]  # Limit length
                                 else:
-                                    self.output.print_info(f"Cleaned query too short: {repr(search_query)}, trying next model...")
                                     continue
                             break
-                        except Exception as model_error:
-                            self.output.print_info(f"Ollama model {model_name} failed: {str(model_error)[:100]}")
+                        except Exception:
                             continue  # Try next model
                             
-            except Exception as e:
-                self.output.print_info(f"Ollama query generation failed: {str(e)}")
+            except Exception:
+                pass  # Continue to fallback
                         
-        except Exception as e:
-            self.output.print_info(f"AI query generation completely failed: {str(e)}")
-            
-        self.output.print_info("Falling back to manual keyword extraction...")
+        except Exception:
+            pass  # Continue to fallback
             
         # Enhanced fallback: Smart keyword extraction with spelling fixes
         import re
@@ -867,16 +882,20 @@ Respond with ONLY the optimized search query, nothing else:"""
                 question = user_input[10:].strip()
                 if question:
                     # Generate search query from the question using AI
-                    self.output.print_info("Generating search query using AI...")
                     try:
                         search_query = self._generate_search_query(question, provider, model)
-                        self.output.print_success(f"AI generated query: '{search_query}'")
-                        
-                        # Show if spelling was corrected
-                        if search_query.lower() != question.lower():
-                            self.output.print_info(f"Original: '{question}' → Optimized: '{search_query}'")
+                        self.output.print_success(f"AI generated query: {search_query}")
                         
                         # Perform search and add to context
+                        search_results = self.search_client.search(search_query, max_results=3)
+                        
+                        # Show URLs accessed (max 3)
+                        if search_results:
+                            urls = [result.url for result in search_results[:3] if result.url]
+                            if urls:
+                                for url in urls:
+                                    self.output.print_info(f"Accessing: {url}")
+                        
                         search_results_text = self.web_search(search_query, max_results=3)
                         search_context = f"Web search results for '{search_query}':\n{search_results_text}"
                         self.session_manager.current_context.append({
@@ -886,7 +905,7 @@ Respond with ONLY the optimized search query, nothing else:"""
                         
                         # Now ask the question - this will be processed as a regular prompt
                         user_input = question
-                        self.output.print_success(f"Search completed for '{search_query}'. Now answering: {question}")
+                        self.output.print_success(f"Now answering: {question}")
                         print()
                         # Don't continue here - let it fall through to process the question
                     except Exception as e:
