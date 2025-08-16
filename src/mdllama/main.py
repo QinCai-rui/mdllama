@@ -51,7 +51,7 @@ def main():
     chat_parser.add_argument("--context", "-c", action="store_true", help="Keep conversation context")
     chat_parser.add_argument("--save", action="store_true", help="Save conversation history")
     chat_parser.add_argument("--no-color", action="store_true", help="Disable colored output")
-    chat_parser.add_argument("--render-markdown", "-r", action="store_true", help="Render markdown in the response")
+    chat_parser.add_argument("--render-markdown", "-r", type=lambda x: x.lower() not in ['false', 'f', '0', 'no'], default=True, help="Render markdown in the response (default: true, use --render-markdown=false to disable)")
     chat_parser.add_argument("-p", "--provider", choices=["ollama", "openai"], default=None, help="Provider to use: ollama or openai (default: ollama)")
     chat_parser.add_argument("--openai-api-base", help=argparse.SUPPRESS)
     chat_parser.add_argument("--prompt-file", help="Path to file containing the prompt")
@@ -67,7 +67,7 @@ def main():
     interactive_parser.add_argument("--save", action="store_true", help="Save conversation history")
     interactive_parser.add_argument("--stream", type=lambda x: x.lower() not in ['false', 'f', '0', 'no'], default=True, help="Enable streaming responses (default: true, use --stream=false to disable)")
     interactive_parser.add_argument("--no-color", action="store_true", help="Disable colored output")
-    interactive_parser.add_argument("--render-markdown", "-r", action="store_true", help="Render markdown in the response")
+    interactive_parser.add_argument("--render-markdown", "-r", type=lambda x: x.lower() not in ['false', 'f', '0', 'no'], default=True, help="Render markdown in the response (default: true, use --render-markdown=false to disable)")
     interactive_parser.add_argument("-p", "--provider", choices=["ollama", "openai"], default=None, help="Provider to use: ollama or openai (default: ollama)")
     interactive_parser.add_argument("--openai-api-base", help=argparse.SUPPRESS)
 
@@ -106,7 +106,7 @@ def main():
         use_colors = False
 
     # Initialize CLI
-    # Enable markdown rendering by default WHEN Rich is available, UNLESS explicitly disabled
+    # Enable markdown rendering by default, UNLESS explicitly disabled
     render_markdown = True
     if hasattr(args, 'render_markdown'):
         render_markdown = args.render_markdown
