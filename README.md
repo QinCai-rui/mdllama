@@ -226,6 +226,10 @@ pip install mdllama
 
 ### Traditional Bash Script Installation (Linux)
 
+> [!WARNING]
+> This method of un-/installation is deprecated and shall be avoided
+> Please use the `pip` method, or use DEB/RPM packages instead
+
 To install **mdllama** using the traditional bash script, run:
 
 ```bash
