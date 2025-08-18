@@ -31,38 +31,45 @@ A CLI tool that lets you chat with Ollama and OpenAI models right from your term
 
 When using `mdllama run` for interactive chat, you have access to special commands:
 
+See man(1) mdllama for details.
+
+```bash
+man 1 mdllama
+```
+
+
 ### Basic Commands
 
-- `exit` or `quit` - End the interactive session
-- `clear` - Clear the current conversation context
-- `models` - Show numbered list of available models for selection
-- `"""` - Start/end multiline input mode for longer messages
+- `exit` or `quit` -- End the interactive session
+- `clear` -- Clear the current conversation context
+- `models` -- Show numbered list of available models for selection
+- `"""` -- Start/end multiline input mode for longer messages
 
 ### File and Content Integration
 
-- `file:path/to/file` - Include local file content in your next message
-- `site:url` - Fetch and include website content in conversation context
-- `system:prompt` - Set or change the system prompt (use without prompt to clear)
+- `file:path/to/file` -- Include local file content in your next message
+- `site:url` -- Fetch and include website content in conversation context
+- `system:prompt` -- Set or change the system prompt (use without prompt to clear)
 
 ### Web Search Commands
 
-- `search:query` - Search the web and add results to conversation context
-- `searchask:query|question` - Search for specific query and ask a question about results
-- `websearch:question` - Let AI generate optimized search query and get results
+- `search:query` -- Search the web and add results to conversation context
+- `searchask:query|question` -- Search for specific query and ask a question about results
+- `websearch:question` -- Let AI generate optimized search query and get results
 
 ### Runtime Controls
 
-- `temp:value` - Change temperature setting (0.0 to 1.0)
-- `model:name` - Switch to different model (or show list if name omitted)
+- `temp:value` -- Change temperature setting (0.0 to 1.0)
+- `model:name` -- Switch to different model (or show list if name omitted)
 
-### Command Line Options
+### CLI Options
 
-- `mdllama search "query"` - Standalone web search command
-- `mdllama sessions` - List all saved conversation sessions
-- `mdllama load-session session_id` - Load a previous conversation
-- `mdllama clear-context` - Clear current conversation context
-- `mdllama models` - List available models
-- `mdllama pull model_name` - Download a model from Ollama registry
+- `mdllama search "query"` -- Standalone web search command (will be deprecated soonTM)
+- `mdllama sessions` -- List all saved conversation sessions
+- `mdllama load-session session_id` -- Load a previous conversation
+- `mdllama clear-context` -- Clear current conversation context
+- `mdllama models` -- List available models
+- `mdllama pull model_name` -- Download a model from Ollama registry (Note: ollama only)
 
 ## OpenAI and Provider Support
 
@@ -75,7 +82,6 @@ When using `mdllama run` for interactive chat, you have access to special comman
 ### Setup Instructions
 
 #### For Ollama (Default)
-
 ```bash
 mdllama setup
 # Or specify explicitly
@@ -83,14 +89,12 @@ mdllama setup --provider ollama
 ```
 
 #### For OpenAI
-
 ```bash
 mdllama setup --provider openai
 # Will prompt for your OpenAI API key
 ```
 
 #### For OpenAI-Compatible APIs
-
 ```bash
 mdllama setup --provider openai --openai-api-base https://ai.hackclub.com
 # Then provide your API key when prompted
