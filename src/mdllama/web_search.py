@@ -100,41 +100,130 @@ class DuckDuckGoSearch:
     def _search_alternative(self, query: str, max_results: int) -> List[WebSearchResult]:
         """
         Alternative search approach when DuckDuckGo fails.
-        Uses multiple search engines and direct approaches.
+        Uses multiple search engines and extracts actual website content.
         """
         results = []
         
-        # Try multiple search approaches for ANY query
-        search_urls = [
-            # Use Google via startpage (privacy-focused proxy)
-            f"https://www.startpage.com/sp/search?query={urllib.parse.quote(query)}",
-            # Use Bing directly
-            f"https://www.bing.com/search?q={urllib.parse.quote(query)}",
-            # Use Yahoo search
-            f"https://search.yahoo.com/search?p={urllib.parse.quote(query)}"
+        # Get actual search results from multiple engines
+        search_engines = [
+            ("startpage", f"https://www.startpage.com/sp/search?query={urllib.parse.quote(query)}"),
+            ("bing", f"https://www.bing.com/search?q={urllib.parse.quote(query)}"),
+            ("yahoo", f"https://search.yahoo.com/search?p={urllib.parse.quote(query)}")
         ]
         
-        for i, url in enumerate(search_urls[:max_results]):
+        for engine_name, search_url in search_engines:
             try:
-                # Try to get content from each search engine
-                response = self.session.get(url, timeout=10)
+                # Get the search results page
+                response = self.session.get(search_url, timeout=10)
                 if response.status_code == 200:
-                    # Extract any useful content we can find
-                    page_text = self._extract_basic_content(response.text)
+                    # Extract actual result URLs from the search page
+                    result_urls = self._extract_result_urls(response.text, engine_name)
                     
-                    result = WebSearchResult(
-                        title=f"Search results for '{query}'",
-                        url=url,
-                        snippet=page_text[:300] + "..." if len(page_text) > 300 else page_text
-                    )
-                    results.append(result)
-                    
+                    # Fetch content from actual destination websites
+                    for result_url in result_urls[:max_results]:
+                        if len(results) >= max_results:
+                            break
+                            
+                        try:
+                            # Fetch actual website content
+                            page_content = self._extract_page_text(result_url)
+                            if page_content and len(page_content.strip()) > 50:
+                                # Extract title from the URL or use a default
+                                title = self._extract_title_from_url(result_url)
+                                
+                                result = WebSearchResult(
+                                    title=title,
+                                    url=result_url,
+                                    snippet=page_content[:400] + "..." if len(page_content) > 400 else page_content
+                                )
+                                results.append(result)
+                        except:
+                            # If we can't fetch the destination page, continue
+                            continue
+                            
                     if len(results) >= max_results:
                         break
             except:
                 continue
         
+        # If we still don't have enough results, add some basic search info
+        if len(results) < max_results:
+            basic_result = WebSearchResult(
+                title=f"Search results for '{query}'",
+                url=f"https://www.google.com/search?q={urllib.parse.quote(query)}",
+                snippet=f"Search query: {query}. Multiple search engines were queried for this information."
+            )
+            results.append(basic_result)
+        
         return results
+    
+    def _extract_result_urls(self, html_content: str, engine_name: str) -> List[str]:
+        """Extract actual destination URLs from search engine results."""
+        import re
+        
+        urls = []
+        
+        if engine_name == "startpage":
+            # Startpage uses specific patterns
+            patterns = [
+                r'<a[^>]*href="(https?://[^"]*)"[^>]*class="[^"]*result[^"]*"',
+                r'<a[^>]*class="[^"]*result[^"]*"[^>]*href="(https?://[^"]*)"'
+            ]
+        elif engine_name == "bing":
+            # Bing search result patterns
+            patterns = [
+                r'<h2><a href="(https?://[^"]*)"',
+                r'<a[^>]*href="(https?://[^"]*)"[^>]*id="[^"]*title[^"]*"'
+            ]
+        elif engine_name == "yahoo":
+            # Yahoo search result patterns
+            patterns = [
+                r'<h3[^>]*><a[^>]*href="(https?://[^"]*)"',
+                r'<a[^>]*href="(https?://[^"]*)"[^>]*class="[^"]*title[^"]*"'
+            ]
+        else:
+            # Generic patterns
+            patterns = [
+                r'<a[^>]*href="(https?://[^"]*)"[^>]*>',
+                r'href="(https?://[^"]*)"'
+            ]
+        
+        for pattern in patterns:
+            matches = re.findall(pattern, html_content, re.IGNORECASE)
+            for match in matches:
+                # Filter out unwanted URLs
+                if not any(skip in match for skip in ['google.com', 'bing.com', 'yahoo.com', 'startpage.com', 
+                                                     'facebook.com', 'twitter.com', 'youtube.com/watch',
+                                                     'javascript:', 'mailto:', '#']):
+                    urls.append(match)
+                    if len(urls) >= 10:  # Limit to avoid too many requests
+                        break
+            if urls:
+                break
+        
+        return urls[:5]  # Return top 5 URLs
+    
+    def _extract_title_from_url(self, url: str) -> str:
+        """Extract a title from URL or fetch page title."""
+        try:
+            # Quick title extraction attempt
+            response = self.session.get(url, timeout=5)
+            if response.status_code == 200:
+                import re
+                title_match = re.search(r'<title[^>]*>([^<]+)</title>', response.text, re.IGNORECASE)
+                if title_match:
+                    title = title_match.group(1).strip()
+                    # Clean up title
+                    title = re.sub(r'\s+', ' ', title)
+                    return title[:100]  # Limit title length
+        except:
+            pass
+        
+        # Fallback: generate title from URL
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        domain = parsed.netloc.replace('www.', '')
+        return f"Results from {domain}"
     
     def _extract_basic_content(self, html_content: str) -> str:
         """Extract basic content from HTML without complex parsing."""

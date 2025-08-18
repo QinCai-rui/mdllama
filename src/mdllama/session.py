@@ -51,9 +51,10 @@ class SessionManager:
         """Prepare messages for completion, including context."""
         messages = self.current_context.copy()
 
-        # Add system prompt if provided and not already present
-        if system_prompt and not any(m.get("role") == "system" for m in messages):
-            messages.append({"role": "system", "content": system_prompt})
+        # Add system prompt if provided
+        if system_prompt:
+            # Insert at the beginning to ensure it's processed first
+            messages.insert(0, {"role": "system", "content": system_prompt})
             
         # Add the text prompt
         messages.append({"role": "user", "content": prompt})
