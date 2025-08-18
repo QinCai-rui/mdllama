@@ -75,6 +75,7 @@ When using `mdllama run` for interactive chat, you have access to special comman
 ### Setup Instructions
 
 #### For Ollama (Default)
+
 ```bash
 mdllama setup
 # Or specify explicitly
@@ -82,12 +83,14 @@ mdllama setup --provider ollama
 ```
 
 #### For OpenAI
+
 ```bash
 mdllama setup --provider openai
 # Will prompt for your OpenAI API key
 ```
 
 #### For OpenAI-Compatible APIs
+
 ```bash
 mdllama setup --provider openai --openai-api-base https://ai.hackclub.com
 # Then provide your API key when prompted
