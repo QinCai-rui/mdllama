@@ -58,18 +58,16 @@ class DuckDuckGoSearch:
             # Limit max_results to reasonable bounds
             max_results = min(max(1, max_results), 10)
             
-            # For weather queries, use known working sites directly
-            if self._is_weather_query(query):
-                results = self._search_weather_sites(query, max_results)
-                if results:
-                    return results
-            
-            # Try HTML search first as it's more reliable
+            # Try HTML search first
             results = self._search_html(query, max_results)
             
             # If HTML search doesn't work, try the instant answer API
             if not results:
                 results = self._search_instant_answer(query, max_results)
+            
+            # If still no results, try alternative search approaches
+            if not results:
+                results = self._search_alternative(query, max_results)
             
             # For each result, fetch and extract readable text from the URL
             results_with_content = []
@@ -99,47 +97,71 @@ class DuckDuckGoSearch:
             self.output.print_error(f"Unexpected error during search: {e}")
             return []
     
-    def _is_weather_query(self, query: str) -> bool:
-        """Check if the query is about weather."""
-        weather_keywords = ['weather', 'temperature', 'forecast', 'rain', 'sunny', 'cloudy', 'wind']
-        return any(keyword in query.lower() for keyword in weather_keywords)
-    
-    def _search_weather_sites(self, query: str, max_results: int) -> List[WebSearchResult]:
-        """Search specific weather sites that are known to work."""
-        # Extract location from query
-        location = 'auckland'  # default
-        words = query.lower().split()
-        for word in words:
-            if word not in ['weather', 'temperature', 'forecast', 'current', 'today', 'rain', 'sunny', 'cloudy']:
-                location = word
-                break
+    def _search_alternative(self, query: str, max_results: int) -> List[WebSearchResult]:
+        """
+        Alternative search approach when DuckDuckGo fails.
+        Uses multiple search engines and direct approaches.
+        """
+        results = []
         
-        # Known working weather sites
-        weather_sites = [
-            {
-                'title': f'{location.title()} Weather - TimeAndDate',
-                'url': f'https://www.timeanddate.com/weather/new-zealand/{location}',
-            },
-            {
-                'title': f'{location.title()} Weather Forecast - Yahoo',
-                'url': f'https://weather.yahoo.com/new-zealand/{location}/{location}-2348327',
-            },
-            {
-                'title': f'{location.title()} Current Weather - OpenWeatherMap',
-                'url': f'https://openweathermap.org/city/2193733',  # Auckland ID
-            }
+        # Try multiple search approaches for ANY query
+        search_urls = [
+            # Use Google via startpage (privacy-focused proxy)
+            f"https://www.startpage.com/sp/search?query={urllib.parse.quote(query)}",
+            # Use Bing directly
+            f"https://www.bing.com/search?q={urllib.parse.quote(query)}",
+            # Use Yahoo search
+            f"https://search.yahoo.com/search?p={urllib.parse.quote(query)}"
         ]
         
-        results = []
-        for site in weather_sites[:max_results]:
-            result = WebSearchResult(site['title'], site['url'], "")
-            # Try to fetch content immediately
-            page_text = self._extract_page_text(site['url'])
-            if page_text and len(page_text.strip()) > 50:
-                result.snippet = page_text[:500] + "..." if len(page_text) > 500 else page_text
-            results.append(result)
+        for i, url in enumerate(search_urls[:max_results]):
+            try:
+                # Try to get content from each search engine
+                response = self.session.get(url, timeout=10)
+                if response.status_code == 200:
+                    # Extract any useful content we can find
+                    page_text = self._extract_basic_content(response.text)
+                    
+                    result = WebSearchResult(
+                        title=f"Search results for '{query}'",
+                        url=url,
+                        snippet=page_text[:300] + "..." if len(page_text) > 300 else page_text
+                    )
+                    results.append(result)
+                    
+                    if len(results) >= max_results:
+                        break
+            except:
+                continue
         
         return results
+    
+    def _extract_basic_content(self, html_content: str) -> str:
+        """Extract basic content from HTML without complex parsing."""
+        try:
+            # Simple text extraction for search results
+            import re
+            
+            # Remove script and style tags
+            html_content = re.sub(r'<script[^>]*>.*?</script>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
+            html_content = re.sub(r'<style[^>]*>.*?</style>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
+            
+            # Look for search result snippets or main content
+            # Find text that looks like search results
+            text_blocks = re.findall(r'<[^>]*>([^<]+)</[^>]*>', html_content)
+            meaningful_text = []
+            
+            for text in text_blocks:
+                text = text.strip()
+                if len(text) > 20 and not any(skip in text.lower() for skip in ['cookie', 'privacy', 'javascript', 'click here']):
+                    meaningful_text.append(text)
+                    if len(' '.join(meaningful_text)) > 500:
+                        break
+            
+            return ' '.join(meaningful_text) if meaningful_text else "Search results available"
+            
+        except:
+            return "Search results available"
     
     def _search_instant_answer(self, query: str, max_results: int) -> List[WebSearchResult]:
         """
