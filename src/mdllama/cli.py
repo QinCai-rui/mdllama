@@ -902,16 +902,16 @@ You MUST base your response on the above search results. Do not say you don't ha
                         self.output.print_success(f"AI generated query: {search_query}")
                         
                         # Perform search and add to context
-                        search_results = self.search_client.search(search_query, max_results=3)
+                        search_results_text = self.web_search(search_query, max_results=3)
                         
-                        # Show URLs accessed (max 3)
+                        # Get the search results to show URLs accessed
+                        search_results = self.search_client.search(search_query, max_results=3)
                         if search_results:
                             urls = [result.url for result in search_results[:3] if result.url]
                             if urls:
                                 for url in urls:
                                     self.output.print_info(f"Accessing: {url}")
                         
-                        search_results_text = self.web_search(search_query, max_results=3)
                         search_context = f"""IMPORTANT: Use the following current web search results to answer the user's question. This is real-time information from the internet:
 
 Web search results for '{search_query}':

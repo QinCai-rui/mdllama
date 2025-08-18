@@ -1,6 +1,7 @@
 """Web search functionality using DuckDuckGo (DDG)
 
-This module provides web search capabilities
+This module provides web search capabilities with professional content extraction
+Inspired by open-webui's multi-strategy approach
 """
 
 # This is created by GitHub Copilot
@@ -9,12 +10,26 @@ import requests
 import json
 import urllib.parse
 import re
+import time
+import logging
 from typing import List, Dict, Optional, Any
 from .output import OutputFormatter
 
+# Try to import BeautifulSoup
+try:
+    from bs4 import BeautifulSoup
+    BS4_AVAILABLE = True
+except ImportError:
+    BS4_AVAILABLE = False
+    BeautifulSoup = None
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 class WebSearchResult:
-    """a single web search result."""
+    """A single web search result."""
     
     def __init__(self, title: str, url: str, snippet: str):
         self.title = title
@@ -30,8 +45,289 @@ class WebSearchResult:
         }
 
 
+class WebContentExtractor:
+    """Professional web content extraction with multiple strategies.
+    
+    Inspired by open-webui's approach using multiple extraction methods
+    for universal compatibility across all websites.
+    """
+    
+    def __init__(self):
+        self.session = requests.Session()
+        # Set a proper user agent to avoid blocks
+        self.session.headers.update({
+            'User-Agent': 'MDLlama/1.0 (https://github.com/your-repo/mdllama) Content Extractor'
+        })
+    
+    def extract_content(self, url: str, timeout: int = 15) -> Dict[str, Any]:
+        """Extract content using multiple strategies for universal compatibility.
+        
+        Args:
+            url: The URL to extract content from
+            timeout: Request timeout in seconds
+            
+        Returns:
+            Dict containing: title, content, metadata, source
+        """
+        try:
+            logger.info(f"Extracting content from: {url}")
+            response = self.session.get(url, timeout=timeout, allow_redirects=True)
+            response.raise_for_status()
+            
+            # Get the final URL after redirects
+            final_url = response.url
+            content_type = response.headers.get('content-type', '').lower()
+            
+            # Strategy 1: Handle non-HTML content types
+            if 'json' in content_type:
+                return self._extract_json_content(response.text, final_url)
+            elif 'xml' in content_type:
+                return self._extract_xml_content(response.text, final_url)
+            elif 'text/' in content_type and 'html' not in content_type:
+                return self._extract_plain_text(response.text, final_url)
+            
+            # Strategy 2: HTML content extraction with BeautifulSoup
+            if BS4_AVAILABLE:
+                return self._extract_html_content_bs4(response.text, final_url)
+            else:
+                # Fallback: Regex-based extraction without BeautifulSoup
+                return self._extract_html_content_regex(response.text, final_url)
+                
+        except Exception as e:
+            logger.error(f"Error extracting content from {url}: {e}")
+            return {
+                'title': f'Error: {str(e)}',
+                'content': f'Failed to extract content from {url}: {str(e)}',
+                'metadata': {'source': url, 'error': str(e)},
+                'source': url
+            }
+    
+    def _extract_html_content_bs4(self, html: str, url: str) -> Dict[str, Any]:
+        """Extract HTML content using BeautifulSoup with multiple strategies."""
+        if not BS4_AVAILABLE or BeautifulSoup is None:
+            return self._extract_html_content_regex(html, url)
+            
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        # Extract title
+        title = self._extract_title(soup, url)
+        
+        # Strategy 1: Try to find main content areas (inspired by open-webui)
+        content_selectors = [
+            'main', 'article', '[role="main"]', '.main-content', 
+            '.content', '.post-content', '.entry-content', '.article-content',
+            '#main', '#content', '#article', '.container .content'
+        ]
+        
+        main_content = None
+        for selector in content_selectors:
+            elements = soup.select(selector)
+            if elements:
+                main_content = elements[0]
+                break
+        
+        # Strategy 2: Remove unwanted elements
+        unwanted_selectors = [
+            'script', 'style', 'nav', 'header', 'footer', 'aside',
+            '.navigation', '.menu', '.sidebar', '.ads', '.advertisement',
+            '.social-share', '.comments', '.comment', '[role="navigation"]'
+        ]
+        
+        # Work on a copy if we found main content, otherwise use full body
+        target_element = main_content if main_content else soup.find('body')
+        if target_element:
+            # Create a new soup from the target element
+            content_soup = BeautifulSoup(str(target_element), 'html.parser')
+            
+            # Remove unwanted elements
+            for selector in unwanted_selectors:
+                for element in content_soup.select(selector):
+                    element.decompose()
+                    
+            # Strategy 3: Extract text with proper formatting
+            text_parts = []
+            for element in content_soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'span']):
+                text = element.get_text(strip=True)
+                if text and len(text) > 10:  # Only include substantial text
+                    text_parts.append(text)
+            
+            content = '\n\n'.join(text_parts) if text_parts else content_soup.get_text(separator='\n', strip=True)
+        else:
+            content = soup.get_text(separator='\n', strip=True)
+        
+        # Clean up the content
+        content = self._clean_text(content)
+        
+        # Extract metadata
+        metadata = self._extract_metadata_bs4(soup, url)
+        
+        return {
+            'title': title,
+            'content': content,
+            'metadata': metadata,
+            'source': url
+        }
+    
+    def _extract_html_content_regex(self, html: str, url: str) -> Dict[str, Any]:
+        """Fallback HTML extraction using regex when BeautifulSoup is not available."""
+        # Extract title
+        title_match = re.search(r'<title[^>]*>(.*?)</title>', html, re.IGNORECASE | re.DOTALL)
+        title = title_match.group(1).strip() if title_match else "Web Page"
+        title = re.sub(r'<[^>]+>', '', title)  # Remove any HTML tags
+        
+        # Remove script and style tags
+        html = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.IGNORECASE | re.DOTALL)
+        html = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.IGNORECASE | re.DOTALL)
+        
+        # Extract text from HTML
+        text = re.sub(r'<[^>]+>', ' ', html)  # Remove HTML tags
+        text = re.sub(r'\s+', ' ', text)  # Normalize whitespace
+        
+        content = self._clean_text(text)
+        
+        return {
+            'title': title,
+            'content': content,
+            'metadata': {'source': url, 'extraction_method': 'regex'},
+            'source': url
+        }
+    
+    def _extract_json_content(self, text: str, url: str) -> Dict[str, Any]:
+        """Extract content from JSON responses."""
+        try:
+            data = json.loads(text)
+            # Try to find meaningful content in the JSON
+            content_parts = []
+            
+            def extract_from_dict(obj, depth=0):
+                if depth > 3:  # Prevent infinite recursion
+                    return
+                if isinstance(obj, dict):
+                    for key, value in obj.items():
+                        if isinstance(value, str) and len(value) > 20:
+                            content_parts.append(f"{key}: {value}")
+                        elif isinstance(value, (dict, list)):
+                            extract_from_dict(value, depth + 1)
+                elif isinstance(obj, list):
+                    for item in obj:
+                        extract_from_dict(item, depth + 1)
+            
+            extract_from_dict(data)
+            content = '\n\n'.join(content_parts) if content_parts else str(data)[:1000]
+            
+            return {
+                'title': 'JSON Data',
+                'content': content,
+                'metadata': {'source': url, 'content_type': 'json'},
+                'source': url
+            }
+        except json.JSONDecodeError:
+            return {
+                'title': 'Invalid JSON',
+                'content': text[:1000],
+                'metadata': {'source': url, 'content_type': 'json', 'error': 'invalid_json'},
+                'source': url
+            }
+    
+    def _extract_xml_content(self, text: str, url: str) -> Dict[str, Any]:
+        """Extract content from XML responses."""
+        # Simple XML text extraction
+        xml_text = re.sub(r'<[^>]+>', ' ', text)
+        xml_text = re.sub(r'\s+', ' ', xml_text).strip()
+        
+        return {
+            'title': 'XML Document',
+            'content': xml_text[:2000],  # Limit length
+            'metadata': {'source': url, 'content_type': 'xml'},
+            'source': url
+        }
+    
+    def _extract_plain_text(self, text: str, url: str) -> Dict[str, Any]:
+        """Extract content from plain text responses."""
+        content = self._clean_text(text[:2000])  # Limit length
+        
+        return {
+            'title': 'Text Document',
+            'content': content,
+            'metadata': {'source': url, 'content_type': 'text'},
+            'source': url
+        }
+    
+    def _extract_title(self, soup, url: str) -> str:
+        """Extract title with multiple fallback strategies."""
+        # Strategy 1: Standard title tag
+        title_tag = soup.find('title')
+        if title_tag and title_tag.get_text(strip=True):
+            return title_tag.get_text(strip=True)
+        
+        # Strategy 2: Open Graph title
+        og_title = soup.find('meta', property='og:title')
+        if og_title and og_title.get('content'):
+            return og_title['content']
+        
+        # Strategy 3: H1 tag
+        h1_tag = soup.find('h1')
+        if h1_tag and h1_tag.get_text(strip=True):
+            return h1_tag.get_text(strip=True)
+        
+        # Strategy 4: Twitter title
+        twitter_title = soup.find('meta', attrs={'name': 'twitter:title'})
+        if twitter_title and twitter_title.get('content'):
+            return twitter_title['content']
+        
+        # Fallback: Use domain name
+        try:
+            from urllib.parse import urlparse
+            domain = urlparse(url).netloc
+            return f"Page from {domain}"
+        except:
+            return "Web Page"
+    
+    def _extract_metadata_bs4(self, soup, url: str) -> Dict[str, Any]:
+        """Extract metadata from HTML using BeautifulSoup."""
+        metadata = {'source': url}
+        
+        # Description
+        desc_tag = soup.find('meta', attrs={'name': 'description'})
+        if desc_tag and desc_tag.get('content'):
+            metadata['description'] = desc_tag['content']
+        
+        # Open Graph description
+        og_desc = soup.find('meta', property='og:description')
+        if og_desc and og_desc.get('content'):
+            metadata['og_description'] = og_desc['content']
+        
+        # Language
+        html_tag = soup.find('html')
+        if html_tag and html_tag.get('lang'):
+            metadata['language'] = html_tag['lang']
+        
+        # Keywords
+        keywords_tag = soup.find('meta', attrs={'name': 'keywords'})
+        if keywords_tag and keywords_tag.get('content'):
+            metadata['keywords'] = keywords_tag['content']
+        
+        return metadata
+    
+    def _clean_text(self, text: str) -> str:
+        """Clean and normalize extracted text."""
+        if not text:
+            return ""
+        
+        # Remove excessive whitespace
+        text = re.sub(r'\s+', ' ', text)
+        # Remove special characters that might cause issues
+        text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x84\x86-\x9f]', '', text)
+        # Normalize line breaks
+        text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
+        
+        return text.strip()
+
+
+
+
 class DuckDuckGoSearch:
-    """DDG web search client."""
+    """DDG web search client with professional content extraction."""
     
     def __init__(self, output: Optional[OutputFormatter] = None):
         self.output = output or OutputFormatter(use_colors=True, render_markdown=False)
@@ -42,51 +338,65 @@ class DuckDuckGoSearch:
             'Accept-Language': 'en-US,en;q=0.9',
             'DNT': '1'
         })
+        # Initialize the professional content extractor
+        self.content_extractor = WebContentExtractor()
     
     def search(self, query: str, max_results: int = 5) -> List[WebSearchResult]:
         """
-        Search DuckDuckGo for the given query.
+        Search DuckDuckGo for the given query with professional content extraction.
         
         Args:
             query: The search query
             max_results: Maximum number of results to return (default: 5, max: 10)
         
         Returns:
-            List of WebSearchResult objects
+            List of WebSearchResult objects with extracted content
         """
         try:
             # Limit max_results to reasonable bounds
             max_results = min(max(1, max_results), 10)
             
-            # Try HTML search first
-            results = self._search_html(query, max_results)
+            # Try alternative search approach first (it's working better)
+            results = self._search_alternative(query, max_results)
             
-            # If HTML search doesn't work, try the instant answer API
+            # If alternative search doesn't work, try HTML search 
+            if not results:
+                results = self._search_html(query, max_results)
+            
+            # If still no results, try the instant answer API
             if not results:
                 results = self._search_instant_answer(query, max_results)
             
-            # If still no results, try alternative search approaches
-            if not results:
-                results = self._search_alternative(query, max_results)
-            
-            # For each result, fetch and extract readable text from the URL
+            # For each result, fetch and extract content using professional extractor
             results_with_content = []
             results_without_content = []
             
             for result in results:
                 if result.url and result.url.startswith("http"):
-                    page_text = self._extract_page_text(result.url)
-                    if page_text and len(page_text.strip()) > 50:  # Only count if we get substantial content
-                        # Use first 500 chars as summary
-                        result.snippet = (page_text[:500] + "..." if len(page_text) > 500 else page_text)
-                        results_with_content.append(result)
-                    else:
+                    try:
+                        # Use the professional content extractor
+                        extracted_data = self.content_extractor.extract_content(result.url)
+                        content_text = extracted_data.get('content', '')
+                        
+                        if content_text and len(content_text.strip()) > 50:  # Only count if we get substantial content
+                            # Use first 800 chars as summary (increased from 500)
+                            result.snippet = (content_text[:800] + "..." if len(content_text) > 800 else content_text)
+                            results_with_content.append(result)
+                            self.output.print_info(f"✓ Extracted content from {extracted_data.get('title', result.url[:50])}")
+                        else:
+                            results_without_content.append(result)
+                            self.output.print_info(f"✗ No substantial content from {result.url[:50]}...")
+                    except Exception as e:
+                        # If we can't fetch content from this URL, still include it
+                        self.output.print_info(f"✗ Could not fetch content from {result.url[:50]}... ({str(e)[:50]})")
                         results_without_content.append(result)
                 else:
                     results_without_content.append(result)
             
-            # Prioritize results with actual content
-            prioritized_results = results_with_content + results_without_content
+            # Prioritize results with actual content, but include others if we don't have enough
+            prioritized_results = results_with_content
+            if len(prioritized_results) < max_results:
+                prioritized_results.extend(results_without_content[:max_results - len(prioritized_results)])
             
             return prioritized_results[:max_results]
             
@@ -125,16 +435,18 @@ class DuckDuckGoSearch:
                             break
                             
                         try:
-                            # Fetch actual website content
-                            page_content = self._extract_page_text(result_url)
+                            # Use professional content extractor
+                            extracted_data = self.content_extractor.extract_content(result_url)
+                            page_content = extracted_data.get('content', '')
+                            
                             if page_content and len(page_content.strip()) > 50:
-                                # Extract title from the URL or use a default
-                                title = self._extract_title_from_url(result_url)
+                                # Use the extracted title or extract from URL
+                                title = extracted_data.get('title', self._extract_title_from_url(result_url))
                                 
                                 result = WebSearchResult(
                                     title=title,
                                     url=result_url,
-                                    snippet=page_content[:400] + "..." if len(page_content) > 400 else page_content
+                                    snippet=page_content[:600] + "..." if len(page_content) > 600 else page_content
                                 )
                                 results.append(result)
                         except:
@@ -475,7 +787,15 @@ class DuckDuckGoSearch:
         """
         try:
             import bs4
-            response = self.session.get(url, timeout=10)
+            # Shorter timeout and headers to avoid being blocked
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate',
+                'Connection': 'keep-alive'
+            }
+            response = self.session.get(url, timeout=8, headers=headers)  # Reduced timeout
             response.raise_for_status()
             html = response.text
             soup = bs4.BeautifulSoup(html, "html.parser")
@@ -496,39 +816,61 @@ class DuckDuckGoSearch:
             # Try multiple strategies to find main content
             content_text = ""
             
-            # Strategy 1: Look for common content containers
-            content_selectors = [
-                'article', 'main', '[role="main"]', '.content', '.post-content', 
-                '.entry-content', '.article-content', '.story-body', '.post-body',
-                '.content-body', '.article-body', '.text-content'
+            # Strategy 1: Look for version-specific content (for kernel.org and similar sites)
+            version_selectors = [
+                'table', '.releases', '.version', '.kernel-version',
+                '#releases', '#latest', '#stable', '#longterm'
             ]
             
-            for selector in content_selectors:
-                content_element = soup.select_one(selector)
-                if content_element:
-                    # Extract text from paragraphs within this content area
-                    paragraphs = content_element.find_all('p')
-                    if paragraphs:
-                        content_text = ' '.join(p.get_text(separator=' ', strip=True) for p in paragraphs)
+            for selector in version_selectors:
+                version_element = soup.select_one(selector)
+                if version_element:
+                    version_text = version_element.get_text(separator=' ', strip=True)
+                    if version_text and len(version_text) > 20:
+                        content_text = version_text
                         break
             
-            # Strategy 2: If no content container found, get paragraphs but filter better
+            # Strategy 2: Look for common content containers
             if not content_text:
-                all_paragraphs = soup.find_all('p')
-                # Filter out short paragraphs (likely navigation or boilerplate)
-                meaningful_paragraphs = []
-                for p in all_paragraphs:
-                    text = p.get_text(strip=True)
-                    # Only include paragraphs that are substantial and don't look like navigation
-                    if (len(text) > 50 and 
+                content_selectors = [
+                    'article', 'main', '[role="main"]', '.content', '.post-content', 
+                    '.entry-content', '.article-content', '.story-body', '.post-body',
+                    '.content-body', '.article-body', '.text-content'
+                ]
+                
+                for selector in content_selectors:
+                    content_element = soup.select_one(selector)
+                    if content_element:
+                        # Extract text from all meaningful elements, not just paragraphs
+                        all_text_elements = content_element.find_all(['p', 'div', 'span', 'td', 'th', 'li'])
+                        if all_text_elements:
+                            content_text = ' '.join(elem.get_text(separator=' ', strip=True) 
+                                                   for elem in all_text_elements 
+                                                   if len(elem.get_text(strip=True)) > 10)
+                            break
+            
+            # Strategy 3: If no content container found, get all meaningful text elements
+            if not content_text:
+                # Get all elements that typically contain useful info
+                all_elements = soup.find_all(['p', 'div', 'td', 'th', 'li', 'h1', 'h2', 'h3', 'span'])
+                meaningful_texts = []
+                
+                for elem in all_elements:
+                    text = elem.get_text(strip=True)
+                    # Include text that might contain version numbers or useful info
+                    if (len(text) > 10 and len(text) < 500 and  # Not too short or too long
                         not any(nav_word in text.lower() for nav_word in 
                                ['edit', 'view source', 'talk', 'languages', 'toggle', 'menu', 
-                                'login', 'sign up', 'register', 'subscribe', 'follow us'])):
-                        meaningful_paragraphs.append(text)
+                                'login', 'sign up', 'register', 'subscribe', 'follow us', 'cookie']) and
+                        # Prioritize text with version-like patterns
+                        (any(char.isdigit() for char in text) or 
+                         any(word in text.lower() for word in ['kernel', 'version', 'release', 'stable', 'latest']))):
+                        meaningful_texts.append(text)
                 
-                content_text = ' '.join(meaningful_paragraphs)
+                # Limit to avoid too much content
+                content_text = ' '.join(meaningful_texts[:20])
             
-            # Strategy 3: Final fallback - get the largest text block
+            # Strategy 4: Final fallback - get the largest meaningful text block
             if not content_text:
                 # Find the element with the most text content
                 max_text = ""
