@@ -1,3 +1,3 @@
 """Version information for mdllama"""
 
-__version__ = "20250818.3"
+__version__ = "20250818.4"
