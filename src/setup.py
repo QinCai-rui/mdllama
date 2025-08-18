@@ -10,7 +10,8 @@ setup(
         "requests",
         "rich",
         "colorama",
-        "ollama"
+        "ollama",
+        "beautifulsoup4"
     ],
     python_requires=">=3.7",
     entry_points={

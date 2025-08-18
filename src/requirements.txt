@@ -2,5 +2,4 @@ requests
 ollama
 colorama
 rich
-
 beautifulsoup4

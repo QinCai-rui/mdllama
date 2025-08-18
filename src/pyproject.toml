@@ -14,7 +14,8 @@ dependencies = [
   "requests",
   "ollama",
   "colorama",
-  "rich"
+  "rich",
+  "beautifulsoup4"
 ]
 
 [project.scripts]
