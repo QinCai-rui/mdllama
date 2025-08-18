@@ -832,7 +832,12 @@ Respond with ONLY the optimized search query, nothing else (not even <think>):""
                     print()
                     
                     # Add search results to conversation context as a system message
-                    search_context = f"Web search results for '{search_query}':\n{search_results_text}"
+                    search_context = f"""IMPORTANT: Use the following current web search results to answer the user's question. This is real-time information from the internet:
+
+Web search results for '{search_query}':
+{search_results_text}
+
+You MUST base your response on the above search results. Do not say you don't have access to real-time information - you do, it's provided above."""
                     self.session_manager.current_context.append({
                         "role": "system", 
                         "content": search_context
@@ -850,7 +855,12 @@ Respond with ONLY the optimized search query, nothing else (not even <think>):""
                     
                     # Perform search and add to context
                     search_results_text = self.web_search(search_query)
-                    search_context = f"Web search results for '{search_query}':\n{search_results_text}"
+                    search_context = f"""IMPORTANT: Use the following current web search results to answer the user's question. This is real-time information from the internet:
+
+Web search results for '{search_query}':
+{search_results_text}
+
+You MUST base your response on the above search results. Do not say you don't have access to real-time information - you do, it's provided above."""
                     self.session_manager.current_context.append({
                         "role": "system", 
                         "content": search_context
@@ -865,7 +875,12 @@ Respond with ONLY the optimized search query, nothing else (not even <think>):""
                     # Just search query, ask a default question
                     search_query = parts[0].strip()
                     search_results_text = self.web_search(search_query)
-                    search_context = f"Web search results for '{search_query}':\n{search_results_text}"
+                    search_context = f"""IMPORTANT: Use the following current web search results to answer the user's question. This is real-time information from the internet:
+
+Web search results for '{search_query}':
+{search_results_text}
+
+You MUST base your response on the above search results. Do not say you don't have access to real-time information - you do, it's provided above."""
                     self.session_manager.current_context.append({
                         "role": "system", 
                         "content": search_context
@@ -897,7 +912,12 @@ Respond with ONLY the optimized search query, nothing else (not even <think>):""
                                     self.output.print_info(f"Accessing: {url}")
                         
                         search_results_text = self.web_search(search_query, max_results=3)
-                        search_context = f"Web search results for '{search_query}':\n{search_results_text}"
+                        search_context = f"""IMPORTANT: Use the following current web search results to answer the user's question. This is real-time information from the internet:
+
+Web search results for '{search_query}':
+{search_results_text}
+
+You MUST base your response on the above search results. Do not say you don't have access to real-time information - you do, it's provided above."""
                         self.session_manager.current_context.append({
                             "role": "system", 
                             "content": search_context
