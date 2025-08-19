@@ -37,7 +37,6 @@ See man(1) mdllama for details.
 man 1 mdllama
 ```
 
-
 ### Basic Commands
 
 - `exit` or `quit` -- End the interactive session
@@ -56,20 +55,6 @@ man 1 mdllama
 - `search:query` -- Search the web and add results to conversation context
 - `searchask:query|question` -- Search for specific query and ask a question about results
 - `websearch:question` -- Let AI generate optimized search query and get results
-
-### Runtime Controls
-
-- `temp:value` -- Change temperature setting (0.0 to 1.0)
-- `model:name` -- Switch to different model (or show list if name omitted)
-
-### CLI Options
-
-- `mdllama search "query"` -- Standalone web search command (will be deprecated soonTM)
-- `mdllama sessions` -- List all saved conversation sessions
-- `mdllama load-session session_id` -- Load a previous conversation
-- `mdllama clear-context` -- Clear current conversation context
-- `mdllama models` -- List available models
-- `mdllama pull model_name` -- Download a model from Ollama registry (Note: ollama only)
 
 ## OpenAI and Provider Support
 
