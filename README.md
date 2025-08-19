@@ -37,36 +37,18 @@ See man(1) mdllama for details.
 man 1 mdllama
 ```
 
-### Basic Commands
-
-- `exit` or `quit` -- End the interactive session
-- `clear` -- Clear the current conversation context
-- `models` -- Show numbered list of available models for selection
-- `"""` -- Start/end multiline input mode for longer messages
-
-### File and Content Integration
-
-- `file:path/to/file` -- Include local file content in your next message
-- `site:url` -- Fetch and include website content in conversation context
-- `system:prompt` -- Set or change the system prompt (use without prompt to clear)
-
-### Web Search Commands
-
-- `search:query` -- Search the web and add results to conversation context
-- `searchask:query|question` -- Search for specific query and ask a question about results
-- `websearch:question` -- Let AI generate optimized search query and get results
-
 ## OpenAI and Provider Support
 
 ### Supported Providers
 
 - **Ollama**: Local models running on your machine
 - **OpenAI**: Official OpenAI API (GPT-3.5, GPT-4, etc.)
-- **OpenAI-compatible**: Any API that follows OpenAI's format (Hackclub AI, LocalAI, etc.)
+- **OpenAI-compatible**: Any API that follows OpenAI's format (I like Groq, so use it! https://groq.com)
 
 ### Setup Instructions
 
 #### For Ollama (Default)
+
 ```bash
 mdllama setup
 # Or specify explicitly
@@ -74,12 +56,14 @@ mdllama setup --provider ollama
 ```
 
 #### For OpenAI
+
 ```bash
 mdllama setup --provider openai
 # Will prompt for your OpenAI API key
 ```
 
 #### For OpenAI-Compatible APIs
+
 ```bash
 mdllama setup --provider openai --openai-api-base https://ai.hackclub.com
 # Then provide your API key when prompted
@@ -110,11 +94,11 @@ Go to this [mdllama demo](https://mdllama-demo.qincai.xyz) to try it out live in
 > - `site:python.org` (fetch website content)
 > - `websearch:What are the latest Python features?` (AI-powered search)
 
-So try it out and see how it works!
+So, try it out and see how it works!
 
 ## Installation
 
-### Install using package manager (recommended)
+### Install using package manager (recommended, supported method)
 
 #### Debian/Ubuntu Installation
 
