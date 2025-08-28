@@ -79,12 +79,26 @@ mdllama chat --provider openai "Explain quantum computing"
 mdllama run --provider openai --model gpt-4
 
 # Interactive session with streaming
-mdllama run --provider openai --stream --render-markdown
+mdllama run --provider openai --stream=true --render-markdown
 ```
 
 ## Live Demo
 
-Go to this [mdllama demo](https://mdllama-demo.qincai.xyz) to try it out live in your browser. The API key is `9c334d5a0863984b641b1375a850fb5d`
+Configure the demo endpoint used by `mdllama` by running the setup flow and entering the API credentials below when prompted.
+
+```bash
+mdllama setup -p openai --openai-api-base https://ai.qincai.xyz
+```
+
+When prompted, provide the following values:
+
+- API key: `sk-proxy-7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e`
+
+After setup you can run the CLI as usual, for example:
+
+```bash
+mdllama run -p openai
+```
 
 > [!NOTE]
 > Try asking the model to give you some markdown-formatted text, or test the web search features:
